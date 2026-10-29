@@ -92,15 +92,16 @@
               <div class="row g-3 mb-3">
                 <div class="col-6">
                   <label class="form-label" for="latField">Latitude</label>
-                  <input type="number" id="latField" name="latitude"
+                  <input type="number" id="latField" name="lat"
                          class="form-control" placeholder="Click map →" step="any" readonly>
                 </div>
                 <div class="col-6">
                   <label class="form-label" for="lngField">Longitude</label>
-                  <input type="number" id="lngField" name="longitude"
+                  <input type="number" id="lngField" name="lng"
                          class="form-control" placeholder="Click map →" step="any" readonly>
                 </div>
               </div>
+              <input type="hidden" id="selectedZoneId" name="zone_id" value="">
 
               <!-- Auto-detected GHMC Jurisdiction -->
               <div id="zonalJurisdictionCard" class="card border-0 mb-3" style="background:#eef6fc; border-radius:10px; border-left:4px solid #1d3557;">
@@ -324,6 +325,8 @@ function fetchZone(lat, lng, loc) {
     .then(r => r.json())
     .then(z => {
       if (z && z.name) {
+        const zoneInput = document.getElementById('selectedZoneId');
+        if (zoneInput && z.id) zoneInput.value = z.id;
         document.getElementById('zoneNameText').textContent = z.name;
         document.getElementById('zoneOfficerText').innerHTML =
           `<i class="fa fa-user-shield me-1 text-primary"></i>Jurisdiction: <strong>${z.officer_name}</strong> &bull; ${z.office_address}`;

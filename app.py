@@ -326,10 +326,10 @@ def _register_public_routes(app: Flask) -> None:
             if not is_clean:
                 return jsonify(success=False, error=err_msg), 400
 
-        # Parse optional GPS coordinates
+        # Parse optional GPS coordinates (accepts both lat/latitude and lng/longitude)
         lat = lng = None
-        raw_lat = request.form.get('lat', '').strip()
-        raw_lng = request.form.get('lng', '').strip()
+        raw_lat = (request.form.get('lat') or request.form.get('latitude') or '').strip()
+        raw_lng = (request.form.get('lng') or request.form.get('longitude') or '').strip()
         if raw_lat and raw_lng:
             try:
                 lat = float(raw_lat)
@@ -341,6 +341,8 @@ def _register_public_routes(app: Flask) -> None:
         image_path = None
         if 'image' in request.files:
             image_path = save_uploaded_image(request.files['image'])
+        elif 'photo' in request.files:
+            image_path = save_uploaded_image(request.files['photo'])
 
         # ---- 3. Duplicate detection -----------------------------------------
         duplicate_suggestions = []
@@ -359,7 +361,12 @@ def _register_public_routes(app: Flask) -> None:
                     })
 
         # ---- 4. Auto-detect GHMC Municipal Zone & Assign Circle Officer ----
-        zone = detect_zone(lat=lat, lng=lng, location_name=required['location_name'])
+        explicit_zone_id = request.form.get('zone_id', '').strip()
+        zone = None
+        if explicit_zone_id:
+            zone = get_zone_by_id(explicit_zone_id)
+        if not zone:
+            zone = detect_zone(lat=lat, lng=lng, location_name=required['location_name'])
 
         # ---- 5. Report ID ---------------------------------------------------
         year = datetime.utcnow().year
