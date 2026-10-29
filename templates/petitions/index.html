@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Community Road Petitions{% endblock %}
+
+{% block content %}
+<section class="petitions-page py-5" style="background:#f8fafc; min-height:85vh;">
+  <div class="container-xl">
+
+    <!-- Header Banner -->
+    <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg, #1d3557 0%, #457b9d 100%); color:#fff; border-radius:12px;">
+      <div class="card-body p-4 p-md-5">
+        <div class="row align-items-center">
+          <div class="col-lg-8">
+            <span class="badge bg-danger px-3 py-2 text-uppercase mb-2 fw-700" style="letter-spacing:1px; font-size:0.75rem;">
+              <i class="fa fa-users me-1"></i>Citizen Voice &bull; Change.org for Road Safety
+            </span>
+            <h1 class="fw-800 display-6 mb-2">Community Road Safety Petitions</h1>
+            <p class="mb-0 text-white-50" style="font-size:1.05rem;">
+              Mobilize your neighborhood. Gather digital signatures on critical potholes, dangerous intersections, and missing signals to compel municipal action.
+            </p>
+          </div>
+          <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <a href="{{ url_for('new_petition') }}" class="btn btn-lg fw-700 shadow"
+               style="background:#e63946; color:#fff; border-radius:10px;">
+              <i class="fa fa-bullhorn me-2"></i>Start a Petition
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="card border-0 shadow-sm p-3 mb-4" style="border-radius:10px; background:#fff;">
+      <form method="GET" action="{{ url_for('petitions_list') }}" class="row g-2 align-items-center">
+        <div class="col-md-5">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa fa-magnifying-glass text-muted"></i></span>
+            <input type="text" name="q" class="form-control" placeholder="Search petitions by road, locality or keywords..."
+                   value="{{ request.args.get('q', '') }}">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <select name="zone" class="form-select">
+            <option value="">All Hyderabad Zones</option>
+            {% for z in all_zones %}
+            <option value="{{ z.id }}" {% if request.args.get('zone') == z.id %}selected{% endif %}>{{ z.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select name="status" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Active" {% if request.args.get('status') == 'Active' %}selected{% endif %}>Active</option>
+            <option value="Milestone Reached" {% if request.args.get('status') == 'Milestone Reached' %}selected{% endif %}>Milestone Reached</option>
+            <option value="Victorious / Repaired" {% if request.args.get('status') == 'Victorious / Repaired' %}selected{% endif %}>Victorious / Repaired</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-dark w-100 fw-600">Filter</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Petitions Grid -->
+    {% if petitions %}
+    <div class="row g-4">
+      {% for p in petitions %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border-0 shadow-sm d-flex flex-column" style="border-radius:12px; overflow:hidden; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+          
+          <div class="card-header bg-white border-0 pt-3 px-4 d-flex justify-content-between align-items-center">
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-700" style="font-size:0.72rem;">
+              {{ p.category_label }}
+            </span>
+            <span class="badge {% if p.status == 'Victorious / Repaired' %}bg-success{% elif p.status == 'Milestone Reached' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:0.7rem;">
+              {{ p.status }}
+            </span>
+          </div>
+
+          <div class="card-body px-4 py-2 flex-grow-1">
+            <h5 class="fw-800 text-dark mb-2" style="font-size:1.1rem; line-height:1.4;">
+              <a href="{{ url_for('petition_detail', petition_id=p.petition_id) }}" class="text-decoration-none text-dark">
+                {{ p.title }}
+              </a>
+            </h5>
+            <div class="text-muted small mb-2">
+              <i class="fa fa-location-dot me-1 text-danger"></i>{{ p.location_name }}
+            </div>
+            <p class="text-muted small mb-3" style="display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+              {{ p.story }}
+            </p>
+          </div>
+
+          <!-- Progress Bar & Footer -->
+          <div class="px-4 pb-4">
+            <div class="d-flex justify-content-between align-items-center small fw-700 mb-1">
+              <span><strong>{{ p.signature_count }}</strong> signed</span>
+              <span class="text-muted">Goal: {{ p.target_signatures }}</span>
+            </div>
+            <div class="progress mb-3" style="height:8px; border-radius:4px; background:#e9ecef;">
+              <div class="progress-bar {% if p.progress_percent >= 100 %}bg-success{% else %}bg-danger{% endif %}"
+                   role="progressbar" style="width: {{ p.progress_percent }}%;"></div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <small class="text-muted" style="font-size:0.75rem;">
+                <i class="fa fa-building-columns me-1"></i>{{ p.zone_name }}
+              </small>
+              <a href="{{ url_for('petition_detail', petition_id=p.petition_id) }}" class="btn btn-sm btn-outline-danger fw-700">
+                View &amp; Sign &rarr;
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 bg-white rounded-3 shadow-sm">
+      <div style="font-size:3.5rem; opacity:0.3;">✍️</div>
+      <h5 class="fw-700 mt-2 text-dark">No Petitions Found</h5>
+      <p class="text-muted small">No petitions matched your search criteria. Be the first to start a civic road campaign!</p>
+      <a href="{{ url_for('new_petition') }}" class="btn btn-danger fw-600 mt-2">
+        <i class="fa fa-plus me-1"></i>Start New Petition
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

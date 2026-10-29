@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Track My Reports{% endblock %}
+
+{% block content %}
+<section class="track-page">
+  <div class="container-xl">
+    <div class="mb-4">
+      <h1 class="section-title">Track Your Report</h1>
+      <p class="text-muted">Enter your Report ID or email address to view the current status and full history.</p>
+    </div>
+
+    <!-- ===== SEARCH CARD ===== -->
+    <div class="track-search-card card mb-4">
+      <div class="card-body p-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-sm-5">
+            <label class="form-label fw-600" for="trackReportId">Report ID</label>
+            <input type="text" id="trackReportId" class="form-control"
+                   placeholder="SR-2026-001" style="letter-spacing:1px;">
+          </div>
+          <div class="col-sm-1 text-center d-none d-sm-block">
+            <span class="text-muted fw-600" style="line-height:38px;">or</span>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label fw-600" for="trackEmail">Email Address</label>
+            <input type="email" id="trackEmail" class="form-control" placeholder="you@example.com">
+          </div>
+          <div class="col-sm-2">
+            <button id="trackBtn" class="btn w-100 fw-700 py-2"
+                    style="background:var(--primary);color:#fff;border-radius:8px;">
+              <i class="fa fa-magnifying-glass me-1"></i>Track
+            </button>
+          </div>
+        </div>
+        <div id="trackError" class="text-danger small mt-2 d-none">
+          <i class="fa fa-circle-exclamation me-1"></i>Please enter a Report ID or email address.
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RESULTS SECTION (initially hidden) ===== -->
+    <div id="resultsSection" class="d-none">
+
+      <!-- Report header -->
+      <div id="singleReportHeader" class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+              <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Report ID</div>
+              <div id="detailReportId" class="fw-800 mb-1"
+                   style="font-size:1.6rem;color:var(--dark);letter-spacing:2px;">SR-2026-001</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span id="detailCategory" class="badge bg-warning text-dark px-3 py-2"></span>
+                <span id="detailStatus" class="badge px-3 py-2"></span>
+              </div>
+              <div>
+                <a id="escalatePetitionBtn" href="/petitions/new" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm">
+                  <i class="fa fa-bullhorn me-1"></i>Turn into Public Petition
+                </a>
+              </div>
+            </div>
+            <div class="text-end">
+              <div class="text-muted" style="font-size:0.8rem;">Submitted</div>
+              <div id="detailDate" class="fw-600" style="color:var(--dark);">—</div>
+              <div class="text-muted mt-1" style="font-size:0.8rem;">Location</div>
+              <div id="detailLocation" class="fw-600" style="color:var(--dark);">—</div>
+            </div>
+          </div>
+
+          <!-- Description & User Photo row -->
+          <div class="row mt-3 pt-3 border-top g-3">
+            <div class="col-12 mb-1">
+              <div class="p-2 px-3 rounded" style="background:#e8f4fd; border-left:4px solid #1d3557; font-size:0.85rem;">
+                <span class="fw-700 text-dark"><i class="fa fa-building-columns text-primary me-1"></i>Assigned Municipal Jurisdiction:</span>
+                <span id="detailZone" class="text-primary fw-700 me-3">—</span>
+                <span class="text-muted"><i class="fa fa-user-shield me-1"></i>Responsible Officer:</span>
+                <span id="detailOfficer" class="text-dark fw-600">—</span>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="text-muted mb-1" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:.5px;">Hazard Description</div>
+              <p id="detailDescription" class="mb-0 text-secondary" style="font-size:0.92rem;line-height:1.5;"></p>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <div id="detailImageWrapper" class="d-none">
+                <div class="text-muted mb-1 small text-md-end"><i class="fa fa-camera me-1"></i>Uploaded Photograph</div>
+                <a id="detailImageLink" href="#" target="_blank" title="Click to view full image">
+                  <img id="detailImage" src="" alt="Hazard Photo"
+                       class="img-thumbnail shadow-sm" style="max-height:160px;max-width:100%;object-fit:cover;border-radius:8px;">
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="singleReportBody" class="row g-4">
+
+        <!-- Status Timeline -->
+        <div class="col-lg-7">
+          <div class="card border-0 shadow-sm h-100" style="border-radius:var(--radius);">
+            <div class="card-body p-4">
+              <h5 class="fw-700 mb-4" style="color:var(--dark);">
+                <i class="fa fa-clock-rotate-left me-2 text-secondary"></i>Status History
+              </h5>
+              <div id="statusTimeline" class="status-timeline"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmation + Resolution -->
+        <div class="col-lg-5">
+
+          <!-- Resolution note (shown if resolved) -->
+          <div id="resolutionCard" class="resolution-card mb-4 d-none">
+            <h6 class="fw-700 mb-2"><i class="fa fa-circle-check me-2"></i>Resolution Note</h6>
+            <p id="resolutionNote" class="mb-0"></p>
+          </div>
+
+          <!-- Rejection/duplicate explanation -->
+          <div id="rejectionCard" class="alert alert-danger mb-4 d-none">
+            <h6 class="fw-700 mb-1"><i class="fa fa-circle-xmark me-2"></i>Report Closed</h6>
+            <p id="rejectionNote" class="mb-0 small"></p>
+          </div>
+
+          <!-- Community confirmations -->
+          <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+            <div class="card-body p-4">
+              <h5 class="fw-700 mb-2" style="color:var(--dark);">
+                <i class="fa fa-users me-2 text-secondary"></i>Community Confirmations
+              </h5>
+              <p class="text-muted mb-3" style="font-size:0.88rem;">
+                Others have confirmed this hazard:
+                <span id="confirmCount" class="fw-700" style="color:var(--primary);">0</span> times
+              </p>
+
+              <div id="confirmFormWrapper">
+                <p class="text-muted small mb-2">Have you seen this hazard? Confirm it to increase its priority.</p>
+                <input type="text" id="confirmName" class="form-control mb-2"
+                       placeholder="Your name" style="font-size:0.88rem;">
+                <input type="email" id="confirmEmail" class="form-control mb-2"
+                       placeholder="Your email" style="font-size:0.88rem;">
+                <textarea id="confirmComment" class="form-control mb-3" rows="2"
+                          placeholder="Your review / observation (e.g. water level, daily commute impact)" style="font-size:0.88rem;"></textarea>
+                <button id="confirmBtn" class="btn w-100 fw-600"
+                        style="background:var(--secondary);color:#fff;border-radius:8px;">
+                  <i class="fa fa-thumbs-up me-1"></i>Confirm & Add Review
+                </button>
+                <div id="confirmMsg" class="small mt-2 d-none"></div>
+              </div>
+
+              <!-- List of community reviews -->
+              <div id="communityReviewsSection" class="mt-4 pt-3 border-top">
+                <h6 class="fw-700 mb-2" style="font-size:0.88rem;color:var(--dark);">
+                  <i class="fa fa-comments text-primary me-1"></i>Citizen Reviews & Confirmations
+                </h6>
+                <div id="communityReviewsList" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /col -->
+
+      </div><!-- /row -->
+
+      <!-- Multiple reports list (when tracking by email) -->
+      <div id="multiReportList" class="d-none mt-3">
+        <h5 class="fw-700 mb-3" style="color:var(--dark);">Your Submitted Reports</h5>
+        <div id="multiReportCards" class="row g-3"></div>
+      </div>
+
+    </div><!-- /#resultsSection -->
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ============================================================
+   SafeRoad — My Reports / Track Page JS
+   ============================================================ */
+
+const STATUS_BADGE_MAP = {
+  'pending':            ['badge-status-pending',      'Pending Review'],
+  'pending_review':     ['badge-status-pending',      'Pending Review'],
+  'under_review':       ['badge-status-under_review', 'Under Review'],
+  'in_progress':        ['badge-status-in_progress',  'Action in Progress'],
+  'action_in_progress': ['badge-status-in_progress',  'Action in Progress'],
+  'resolved':           ['badge-status-resolved',     'Resolved'],
+  'rejected':           ['badge-status-rejected',     'Rejected'],
+  'duplicate':          ['badge-status-duplicate',    'Duplicate']
+};
+
+const STATUS_ICONS = {
+  'pending':            'fa-clock',
+  'pending_review':     'fa-clock',
+  'under_review':       'fa-eye',
+  'in_progress':        'fa-hard-hat',
+  'action_in_progress': 'fa-hard-hat',
+  'resolved':           'fa-circle-check',
+  'rejected':           'fa-circle-xmark',
+  'duplicate':          'fa-copy'
+};
+
+/* ---- Pre-fill from URL param ---- */
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('report_id')) {
+  document.getElementById('trackReportId').value = urlParams.get('report_id');
+}
+if (urlParams.get('email')) {
+  document.getElementById('trackEmail').value = urlParams.get('email');
+}
+
+document.getElementById('trackBtn').addEventListener('click', handleTrack);
+document.getElementById('trackReportId').addEventListener('keydown', e => { if(e.key==='Enter') handleTrack(); });
+document.getElementById('trackEmail').addEventListener('keydown', e => { if(e.key==='Enter') handleTrack(); });
+
+async function handleTrack() {
+  const ridInput   = document.getElementById('trackReportId').value.trim();
+  const emailInput = document.getElementById('trackEmail').value.trim();
+  const errEl      = document.getElementById('trackError');
+
+  if (!ridInput && !emailInput) {
+    errEl.textContent = 'Please enter a Report ID or email address.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+  errEl.classList.add('d-none');
+
+  const btn = document.getElementById('trackBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching…';
+
+  try {
+    let data = null;
+
+    // Determine query: if ridInput has '@', treating it as email
+    if (ridInput && ridInput.includes('@')) {
+      const resp = await fetch(`/api/my_reports?email=${encodeURIComponent(ridInput)}`);
+      if (resp.ok) data = await resp.json();
+    } else if (ridInput) {
+      // Try report_id first
+      const resp = await fetch(`/api/track/${encodeURIComponent(ridInput)}`);
+      if (resp.ok) {
+        data = await resp.json();
+      } else if (emailInput) {
+        // Fallback to email if rid failed but email was also entered
+        const respEmail = await fetch(`/api/my_reports?email=${encodeURIComponent(emailInput)}`);
+        if (respEmail.ok) data = await respEmail.json();
+      }
+    } else if (emailInput) {
+      const resp = await fetch(`/api/my_reports?email=${encodeURIComponent(emailInput)}`);
+      if (resp.ok) data = await resp.json();
+    }
+
+    if (!data) {
+      showNoResult('No hazard reports found with the provided details. Please check the ID or email.');
+      return;
+    }
+
+    if (data.reports && data.reports.length > 1) {
+      renderMultiple(data.reports);
+    } else if (data.report) {
+      renderReport(data.report);
+    } else if (data.reports && data.reports.length === 1) {
+      renderReport(data.reports[0]);
+    } else {
+      showNoResult('No hazard reports found with the provided details.');
+    }
+  } catch(err) {
+    console.error('Track error:', err);
+    showNoResult('Error fetching report. Please check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-magnifying-glass me-1"></i>Track';
+  }
+}
+
+function showNoResult(msg) {
+  document.getElementById('resultsSection').classList.add('d-none');
+  const errEl = document.getElementById('trackError');
+  errEl.textContent = msg || 'No report found with the provided details.';
+  errEl.classList.remove('d-none');
+}
+
+function renderReport(raw) {
+  const r = raw.report || raw;
+  document.getElementById('singleReportHeader').classList.remove('d-none');
+  document.getElementById('singleReportBody').classList.remove('d-none');
+  document.getElementById('multiReportList').classList.add('d-none');
+
+  /* Header */
+  document.getElementById('detailReportId').textContent = r.report_id || 'N/A';
+  document.getElementById('detailDate').textContent     = r.submitted_at || '—';
+  document.getElementById('detailLocation').textContent = r.location_name || '—';
+  document.getElementById('detailZone').textContent     = r.zone_name || 'Hyderabad Central';
+  document.getElementById('detailOfficer').textContent  = r.assigned_officer || 'Circle Engineering Cell';
+
+  const catEl = document.getElementById('detailCategory');
+  catEl.textContent = (r.category || '').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+  const statusKey  = (r.status || '').replace(/ /g,'_').toLowerCase();
+  const [cls, lbl] = STATUS_BADGE_MAP[statusKey] || ['badge-status-pending', (r.status || 'Pending Review')];
+  const statusEl   = document.getElementById('detailStatus');
+  statusEl.className = `badge px-3 py-2 ${cls}`;
+  statusEl.textContent = lbl;
+
+  /* Escalate button link */
+  const escBtn = document.getElementById('escalatePetitionBtn');
+  if (escBtn && r.report_id) {
+    escBtn.href = `/petitions/new?report_id=${encodeURIComponent(r.report_id)}`;
+  }
+
+  /* Description */
+  const descEl = document.getElementById('detailDescription');
+  if (descEl) descEl.textContent = r.description || 'No description provided.';
+
+  /* User Photo */
+  const imgWrapper = document.getElementById('detailImageWrapper');
+  const imgEl      = document.getElementById('detailImage');
+  const imgLink    = document.getElementById('detailImageLink');
+  if (imgWrapper && imgEl && imgLink) {
+    if (r.image_path) {
+      const src = r.image_path.startsWith('/') ? r.image_path : `/static/${r.image_path}`;
+      imgEl.src = src;
+      imgLink.href = src;
+      imgWrapper.classList.remove('d-none');
+    } else {
+      imgWrapper.classList.add('d-none');
+    }
+  }
+
+  /* Timeline */
+  const timeline = document.getElementById('statusTimeline');
+  const history  = r.status_history || [];
+  const currentStatus = statusKey;
+
+  timeline.innerHTML = history.map((h, i) => {
+    const hKey = (h.status || h.new_status || '').replace(/ /g,'_').toLowerCase();
+    const isCurrent = hKey === currentStatus && i === history.length - 1;
+    const isCompleted = i < history.length - 1;
+    const iconCls = STATUS_ICONS[hKey] || 'fa-circle';
+    const [hCls, hLbl] = STATUS_BADGE_MAP[hKey] || ['badge-status-pending', (h.status || h.new_status || 'Pending Review')];
+
+    return `
+      <div class="timeline-item ${isCurrent ? 'current' : ''} ${isCompleted ? 'completed' : ''}">
+        <div class="timeline-dot">
+          <i class="fa ${iconCls}" style="font-size:.55rem;"></i>
+        </div>
+        <div class="timeline-status">${hLbl}</div>
+        <div class="timeline-meta">
+          ${h.changed_at || ''}
+          ${h.changed_by ? `· by <strong>${h.changed_by}</strong>` : ''}
+        </div>
+        ${h.note ? `<div class="timeline-note">${h.note}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  if (!history.length) {
+    timeline.innerHTML = '<p class="text-muted small">No status history yet.</p>';
+  }
+
+  /* Resolution / Rejection cards */
+  const resCard = document.getElementById('resolutionCard');
+  const rejCard = document.getElementById('rejectionCard');
+
+  if (statusKey === 'resolved' && r.resolution_note) {
+    document.getElementById('resolutionNote').textContent = r.resolution_note;
+    resCard.classList.remove('d-none');
+    rejCard.classList.add('d-none');
+  } else if (statusKey === 'rejected' || statusKey === 'duplicate') {
+    const lastNote = history.length ? (history[history.length-1].note || '') : '';
+    document.getElementById('rejectionNote').textContent = lastNote || 'This report was closed by an administrator.';
+    rejCard.classList.remove('d-none');
+    resCard.classList.add('d-none');
+  } else {
+    resCard.classList.add('d-none');
+    rejCard.classList.add('d-none');
+  }
+
+  /* Confirmations & Reviews */
+  const count = r.confirmation_count ?? (r.confirmations ? r.confirmations.length : 0);
+  document.getElementById('confirmCount').textContent = count;
+  document.getElementById('confirmBtn').dataset.reportId = r.report_id;
+  document.getElementById('confirmMsg').classList.add('d-none');
+
+  const reviewsList = document.getElementById('communityReviewsList');
+  const confirms = r.confirmations || [];
+  if (confirms.length > 0) {
+    reviewsList.innerHTML = confirms.map(c => `
+      <div class="p-2 rounded bg-light border-start border-3 border-primary" style="font-size:0.82rem;">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <strong class="text-dark">${c.confirmer_name || c.name || 'Citizen'}</strong>
+          <small class="text-muted">${c.confirmed_at || ''}</small>
+        </div>
+        <p class="mb-0 text-secondary" style="font-size:0.8rem;">
+          ${c.comment ? `"${c.comment}"` : '<em>Confirmed seeing this hazard.</em>'}
+        </p>
+      </div>
+    `).join('');
+  } else {
+    reviewsList.innerHTML = '<p class="text-muted small mb-0">No citizen reviews yet. Be the first to confirm!</p>';
+  }
+
+  /* Show results */
+  document.getElementById('resultsSection').classList.remove('d-none');
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMultiple(reports) {
+  document.getElementById('singleReportHeader').classList.add('d-none');
+  document.getElementById('singleReportBody').classList.add('d-none');
+  document.getElementById('resolutionCard').classList.add('d-none');
+  document.getElementById('rejectionCard').classList.add('d-none');
+
+  const multiList  = document.getElementById('multiReportList');
+  const multiCards = document.getElementById('multiReportCards');
+
+  multiCards.innerHTML = reports.map(r => {
+    const statusKey = (r.status||'').replace(/ /g,'_').toLowerCase();
+    const [cls, lbl] = STATUS_BADGE_MAP[statusKey] || ['bg-secondary','Unknown'];
+    return `
+      <div class="col-md-6 col-lg-4">
+        <div class="report-card card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-700 text-white">${r.report_id}</span>
+            <span class="badge bg-warning text-dark" style="font-size:.7rem;">${(r.category||'').replace(/_/g,' ')}</span>
+          </div>
+          <div class="card-body">
+            <div class="fw-600 mb-1">${r.location_name || '—'}</div>
+            <div class="text-muted small">${r.submitted_at || ''}</div>
+          </div>
+          <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+            <span class="badge ${cls}">${lbl}</span>
+            <button class="btn btn-sm btn-outline-primary" onclick="loadSingle('${r.report_id}')">
+              Details <i class="fa fa-arrow-right ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  multiList.classList.remove('d-none');
+  document.getElementById('resultsSection').classList.remove('d-none');
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function loadSingle(reportId) {
+  try {
+    const resp = await fetch(`/api/track/${encodeURIComponent(reportId)}`);
+    if (!resp.ok) throw new Error('Not found');
+    const data = await resp.json();
+    renderReport(data.report || data);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch(err) {
+    console.error('Error loading report:', err);
+  }
+}
+
+/* ---- Confirm hazard ---- */
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  const rid     = document.getElementById('confirmBtn').dataset.reportId;
+  const name    = document.getElementById('confirmName').value.trim();
+  const email   = document.getElementById('confirmEmail').value.trim();
+  const comment = document.getElementById('confirmComment') ? document.getElementById('confirmComment').value.trim() : '';
+  const msgEl   = document.getElementById('confirmMsg');
+
+  if (!name || !email) {
+    msgEl.className = 'small mt-2 text-danger';
+    msgEl.textContent = 'Please enter your name and email.';
+    msgEl.classList.remove('d-none');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/confirm/${rid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, comment })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      msgEl.className = 'small mt-2 text-success';
+      msgEl.textContent = '✅ Thank you! Your review and confirmation have been recorded.';
+      msgEl.classList.remove('d-none');
+      const newCount = data.total_confirmations || data.confirmation_count || parseInt(document.getElementById('confirmCount').textContent) + 1;
+      document.getElementById('confirmCount').textContent = newCount;
+      document.getElementById('confirmBtn').disabled = true;
+      if (comment) {
+        const reviewsList = document.getElementById('communityReviewsList');
+        const newReview = `
+          <div class="p-2 rounded bg-light border-start border-3 border-success" style="font-size:0.82rem;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-dark">${name}</strong>
+              <small class="text-muted">Just now</small>
+            </div>
+            <p class="mb-0 text-secondary" style="font-size:0.8rem;">"${comment}"</p>
+          </div>
+        `;
+        if (reviewsList.innerHTML.includes('No citizen reviews yet')) {
+          reviewsList.innerHTML = newReview;
+        } else {
+          reviewsList.insertAdjacentHTML('afterbegin', newReview);
+        }
+      }
+    } else {
+      msgEl.className = 'small mt-2 text-danger';
+      msgEl.textContent = data.message || data.error || 'Could not confirm. You may have already confirmed.';
+      msgEl.classList.remove('d-none');
+    }
+  } catch {
+    msgEl.className = 'small mt-2 text-danger';
+    msgEl.textContent = 'Network error. Please try again.';
+    msgEl.classList.remove('d-none');
+  }
+});
+
+/* ---- Auto-track on load if URL param present ---- */
+if (urlParams.get('report_id') || urlParams.get('email')) {
+  handleTrack();
+}
+</script>
+{% endblock %}

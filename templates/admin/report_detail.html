@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Report {{ report.report_id if report else 'Detail' }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #detailMap { height: 260px; border-radius: 0 0 12px 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+  <div class="container-xl">
+
+    <!-- Breadcrumb & Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0" style="font-size:0.85rem;">
+          <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('admin_reports_list') }}">Reports</a></li>
+          <li class="breadcrumb-item active">{{ report.report_id if report else 'Detail' }}</li>
+        </ol>
+      </nav>
+      <a href="{{ url_for('admin_logout') }}" class="btn btn-sm btn-outline-danger fw-600">
+        <i class="fa fa-right-from-bracket me-1"></i>Logout
+      </a>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- ===== LEFT COLUMN ===== -->
+      <div class="col-lg-7">
+
+        <!-- Report info card -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+          <div class="card-header d-flex justify-content-between align-items-center py-3 px-4"
+               style="background:var(--dark);color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+            <h5 class="mb-0 fw-700">
+              <i class="fa fa-file-lines me-2"></i>{{ report.report_id if report else 'Report Detail' }}
+            </h5>
+            <span class="badge bg-warning text-dark px-3 py-2" style="font-size:0.82rem;">
+              {{ report.category | replace('_',' ') | title if report else '—' }}
+            </span>
+          </div>
+          <div class="card-body p-4">
+
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Submitter Name</div>
+                <div class="fw-600">{{ report.submitter_name if report else '—' }}</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Email</div>
+                <div class="fw-600">{{ report.submitter_email if report else '—' }}</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Location</div>
+                <div class="fw-600">{{ report.location_name if report else '—' }}</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Submitted At</div>
+                <div class="fw-600">
+                  {{ report.submitted_at.strftime('%d %b %Y, %H:%M') if report and report.submitted_at else '—' }}
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Coordinates</div>
+                <div class="fw-600 font-monospace" style="font-size:0.88rem;">
+                  {% if report and report.latitude %}
+                    {{ report.latitude }}, {{ report.longitude }}
+                  {% else %}
+                    Not set
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Severity</div>
+                <div class="severity-stars">
+                  {% if report %}
+                    {% for i in range(1, 6) %}
+                      <i class="fa fa-star {% if i <= report.severity %}text-warning{% else %}text-secondary{% endif %}"></i>
+                    {% endfor %}
+                  {% endif %}
+                  <span class="text-muted ms-1" style="font-size:0.82rem;">{{ report.severity if report else 0 }}/5</span>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Confirmations</div>
+                <div class="fw-700 text-danger">{{ report.confirmation_count if report else 0 }} confirmation(s)</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Municipal Zone</div>
+                <div class="fw-700 text-primary">{{ report.zone_name or 'Hyderabad Central' }}</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Assigned Circle Engineer</div>
+                <div class="fw-600 text-dark">{{ report.assigned_officer or 'Er. K. V. Rao' }}</div>
+              </div>
+            </div>
+
+            <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Description</div>
+            <p class="p-3 rounded-3" style="background:#f8f9fa;font-size:0.9rem;line-height:1.7;">
+              {{ report.description if report else '—' }}
+            </p>
+
+          </div>
+        </div>
+
+        <!-- Mini Leaflet Map -->
+        {% if report and report.latitude %}
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+          <div class="card-header py-2 px-4" style="background:#f8f9fa;border-radius:var(--radius) var(--radius) 0 0;">
+            <small class="fw-600 text-muted"><i class="fa fa-location-dot me-1 text-danger"></i>Pinned Location</small>
+          </div>
+          <div id="detailMap"></div>
+        </div>
+        {% endif %}
+
+        <!-- Uploaded Photo -->
+        {% if report and (report.image_path or report.photo_path) %}
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+          <div class="card-header py-2 px-4 d-flex justify-content-between align-items-center" style="background:#f8f9fa;border-radius:var(--radius) var(--radius) 0 0;">
+            <small class="fw-700 text-dark"><i class="fa fa-image me-1 text-primary"></i>Uploaded Photograph by Citizen</small>
+            <a href="{{ url_for('static', filename=report.image_path or report.photo_path) }}" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem;">
+              <i class="fa fa-arrow-up-right-from-square me-1"></i>View Full Resolution
+            </a>
+          </div>
+          <div class="card-body p-3 text-center bg-light">
+            <a href="{{ url_for('static', filename=report.image_path or report.photo_path) }}" target="_blank">
+              <img src="{{ url_for('static', filename=report.image_path or report.photo_path) }}"
+                   alt="Hazard photo uploaded by citizen" class="img-fluid rounded border shadow-sm"
+                   style="max-height:360px;object-fit:contain;background:#fff;">
+            </a>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Confirmations List -->
+        {% if report and report.confirmation_list %}
+        <div class="card border-0 shadow-sm" style="border-radius:var(--radius);">
+          <div class="card-header py-3 px-4" style="background:var(--dark);color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+            <h6 class="mb-0 fw-700"><i class="fa fa-users me-2"></i>Community Confirmations</h6>
+          </div>
+          <div class="card-body p-0">
+            <table class="table mb-0" style="font-size:0.85rem;">
+              <thead>
+                <tr>
+                  <th style="padding:0.75rem 1rem;background:#f8f9fa;font-weight:600;font-size:0.78rem;border-bottom:1px solid #dee2e6;">Name</th>
+                  <th style="padding:0.75rem 1rem;background:#f8f9fa;font-weight:600;font-size:0.78rem;border-bottom:1px solid #dee2e6;">Email</th>
+                  <th style="padding:0.75rem 1rem;background:#f8f9fa;font-weight:600;font-size:0.78rem;border-bottom:1px solid #dee2e6;">Review / Observation</th>
+                  <th style="padding:0.75rem 1rem;background:#f8f9fa;font-weight:600;font-size:0.78rem;border-bottom:1px solid #dee2e6;">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in report.confirmation_list %}
+                <tr>
+                  <td style="padding:0.65rem 1rem;"><strong>{{ c.name }}</strong></td>
+                  <td style="padding:0.65rem 1rem;" class="text-muted">{{ c.email }}</td>
+                  <td style="padding:0.65rem 1rem;" class="text-secondary small"><em>{{ c.comment or 'Verified condition' }}</em></td>
+                  <td style="padding:0.65rem 1rem;" class="text-muted small">{{ c.confirmed_at }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+      </div><!-- /col-lg-7 -->
+
+      <!-- ===== RIGHT COLUMN ===== -->
+      <div class="col-lg-5">
+
+        <!-- Status management card -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+          <div class="card-header py-3 px-4"
+               style="background:var(--dark);color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+            <h5 class="mb-0 fw-700"><i class="fa fa-sliders me-2"></i>Manage Report</h5>
+          </div>
+          <div class="card-body p-4">
+
+            <!-- Current status -->
+            <div class="mb-3">
+              <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Current Status</div>
+              {% if report %}
+                {% set s = (report.status or 'pending') | replace(' ','_') | lower %}
+                <span class="badge badge-status-{{ s }} px-3 py-2 fs-6">{{ report.status | title }}</span>
+              {% else %}
+                <span class="badge bg-secondary px-3 py-2">Unknown</span>
+              {% endif %}
+            </div>
+
+            <form method="POST"
+                  action="{{ url_for('admin_update_report', report_id=report.report_id) if report else '#' }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+              <!-- New Status -->
+              <div class="mb-3">
+                <label class="form-label fw-600" for="newStatus">Update Status</label>
+                <select id="newStatus" name="status" class="form-select">
+                  {% set status_choices = [
+                    ('pending', 'Pending Review'),
+                    ('under_review', 'Under Review'),
+                    ('in_progress', 'Action in Progress'),
+                    ('resolved', 'Resolved'),
+                    ('rejected', 'Rejected'),
+                    ('duplicate', 'Duplicate')
+                  ] %}
+                  {% for val, lbl in status_choices %}
+                    <option value="{{ val }}"
+                      {% if report and (report.status or '').replace(' ','_').lower() == val %}selected{% endif %}>
+                      {{ lbl }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Priority Level -->
+              <div class="mb-3">
+                <label class="form-label fw-600" for="priorityLevel">Priority Level</label>
+                <select id="priorityLevel" name="priority" class="form-select">
+                  <option value="low"    {% if report and (report.priority or 'low').lower()=='low' %}selected{% endif %}>Low</option>
+                  <option value="medium" {% if report and (report.priority or '').lower()=='medium' %}selected{% endif %}>Medium</option>
+                  <option value="high"   {% if report and (report.priority or '').lower()=='high' %}selected{% endif %}>High</option>
+                </select>
+              </div>
+
+              <!-- Priority Score -->
+              {% if report and report.priority_score is defined %}
+              <div class="mb-3">
+                <div class="text-muted mb-1" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Priority Score</div>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:10px;border-radius:8px;">
+                    <div class="progress-bar"
+                         style="width:{{ [report.priority_score, 100] | min }}%;background:var(--primary);border-radius:8px;"
+                         role="progressbar"></div>
+                  </div>
+                  <span class="fw-700" style="color:var(--primary);">{{ report.priority_score }}</span>
+                </div>
+              </div>
+              {% endif %}
+
+              <!-- Resolution Note -->
+              <div class="mb-4">
+                <label class="form-label fw-600" for="resolutionNote">Resolution Note / Comments</label>
+                <textarea id="resolutionNote" name="resolution_note" class="form-control" rows="4"
+                          placeholder="Enter resolution details, reason for rejection, or admin notes…">{{ report.resolution_note if report and report.resolution_note else '' }}</textarea>
+              </div>
+
+              <button type="submit" class="btn w-100 fw-700 py-3"
+                      style="background:var(--primary);color:#fff;border-radius:10px;font-size:1rem;">
+                <i class="fa fa-floppy-disk me-2"></i>Update Report
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Status History Timeline -->
+        <div class="card border-0 shadow-sm" style="border-radius:var(--radius);">
+          <div class="card-header py-3 px-4" style="background:#f8f9fa;border-radius:var(--radius) var(--radius) 0 0;">
+            <h6 class="mb-0 fw-700" style="color:var(--dark);">
+              <i class="fa fa-clock-rotate-left me-2 text-secondary"></i>Status History
+            </h6>
+          </div>
+          <div class="card-body p-4">
+            {% if report and report.status_history %}
+            <div class="status-timeline">
+              {% for h in report.status_history %}
+              {% set hkey = (h.status or '') | replace(' ','_') | lower %}
+              {% set is_last = loop.last %}
+              <div class="timeline-item {% if is_last %}current{% else %}completed{% endif %}">
+                <div class="timeline-dot">
+                  <i class="fa fa-circle-dot" style="font-size:.5rem;"></i>
+                </div>
+                <div class="timeline-status">{{ h.status | title }}</div>
+                <div class="timeline-meta">
+                  {{ h.changed_at or '' }}
+                  {% if h.changed_by %}&nbsp;· by <strong>{{ h.changed_by }}</strong>{% endif %}
+                </div>
+                {% if h.note %}
+                <div class="timeline-note">{{ h.note }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">No history yet.</p>
+            {% endif %}
+          </div>
+        </div>
+
+      </div><!-- /col-lg-5 -->
+
+    </div><!-- /row -->
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+{% if report and report.latitude %}
+(function() {
+  const lat = {{ report.latitude }};
+  const lng = {{ report.longitude }};
+  const map = L.map('detailMap', { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OSM</a>',
+    maxZoom: 19
+  }).addTo(map);
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:22px;height:22px;background:#e63946;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>`,
+    iconSize: [22,22], iconAnchor: [11,11]
+  });
+  L.marker([lat, lng], {icon}).addTo(map)
+    .bindPopup(`<b>{{ report.report_id }}</b><br>{{ report.location_name or 'Hazard Location' }}`)
+    .openPopup();
+})();
+{% endif %}
+</script>
+{% endblock %}

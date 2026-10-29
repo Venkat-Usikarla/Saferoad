@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment secrets
+.env
+.env.local
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Uploaded hazard photos (keep directory via .gitkeep)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# SQLite database (optional, can be recreated via init_db.py)
+# saferoad.db
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

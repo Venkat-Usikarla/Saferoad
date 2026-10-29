@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — SafeRoute Planner{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .saferoute-page { padding: 30px 0 60px; background: #f8fafc; }
+  .route-map-card {
+    border: none;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    height: 620px;
+  }
+  #routeMap { height: 100%; width: 100%; }
+  .route-panel {
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    background: #fff;
+  }
+  .score-dial {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  }
+  .hazard-timeline-item {
+    border-left: 3px solid #dee2e6;
+    padding-left: 15px;
+    position: relative;
+    margin-bottom: 15px;
+  }
+  .hazard-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 4px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .preset-route-btn {
+    font-size: 0.78rem;
+    border-radius: 20px;
+    padding: 4px 12px;
+    transition: all 0.2s;
+  }
+  .preset-route-btn:hover {
+    background: #1d3557;
+    color: #fff !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="saferoute-page">
+  <div class="container-xl">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <div class="badge bg-danger-subtle text-danger border border-danger-subtle mb-1 fw-700">
+          <i class="fa fa-shield-halved me-1"></i>DT FEATURE: ROAD SAFETY ROUTE MAP
+        </div>
+        <h2 class="section-title mb-0">SafeRoute — Commute Road Safety Planner</h2>
+        <p class="text-muted mb-0">Detect active potholes, waterlogging &amp; infrastructure hazards along your travel corridor</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('view_map') }}" class="btn btn-outline-secondary fw-600 btn-sm">
+          <i class="fa fa-map me-1"></i>City Hazard Map
+        </a>
+        <a href="{{ url_for('petitions_list') }}" class="btn btn-outline-primary fw-600 btn-sm">
+          <i class="fa fa-bullhorn me-1"></i>Community Petitions
+        </a>
+      </div>
+    </div>
+
+    <!-- Quick Presets -->
+    <div class="card border-0 shadow-sm p-3 mb-4" style="border-radius:var(--radius); background:#fff;">
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <span class="small fw-700 text-muted text-uppercase" style="letter-spacing:0.5px;">
+          <i class="fa fa-bolt text-warning me-1"></i>Quick Commute Corridors:
+        </span>
+        {% for pr in sample_routes %}
+        <button type="button" class="btn btn-sm btn-outline-dark preset-route-btn"
+                onclick="loadPresetRoute({{ pr | tojson }})">
+          {{ pr.name }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- LEFT: Inputs & Analysis Panel -->
+      <div class="col-lg-5">
+        <div class="route-panel p-4 mb-4">
+          <h5 class="fw-700 text-dark mb-3">
+            <i class="fa fa-route me-2 text-primary"></i>Plan Safe Route
+          </h5>
+
+          <!-- Route Points Form -->
+          <div class="mb-3">
+            <label class="form-label small fw-700 text-muted">
+              <i class="fa fa-circle-dot text-success me-1"></i>Start Location (A)
+            </label>
+            <div class="input-group">
+              <input type="text" id="startInput" class="form-control form-control-sm"
+                     placeholder="e.g. Cyber Towers, Hitec City" value="Cyber Towers, Hitec City">
+              <button class="btn btn-sm btn-outline-secondary" type="button" onclick="setMode('start')" title="Click on map to pin">
+                <i class="fa fa-location-crosshairs text-success"></i> Pin
+              </button>
+            </div>
+            <input type="hidden" id="startLat" value="17.4504">
+            <input type="hidden" id="startLng" value="78.3808">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-700 text-muted">
+              <i class="fa fa-flag-checkered text-danger me-1"></i>Destination (B)
+            </label>
+            <div class="input-group">
+              <input type="text" id="endInput" class="form-control form-control-sm"
+                     placeholder="e.g. Charminar, Old City" value="Charminar, Old City">
+              <button class="btn btn-sm btn-outline-secondary" type="button" onclick="setMode('end')" title="Click on map to pin">
+                <i class="fa fa-location-crosshairs text-danger"></i> Pin
+              </button>
+            </div>
+            <input type="hidden" id="endLat" value="17.3616">
+            <input type="hidden" id="endLng" value="78.4747">
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <small class="text-muted" style="font-size:0.75rem;">
+              <i class="fa fa-hand-pointer me-1"></i>Click map to adjust points
+            </small>
+            <div class="d-flex align-items-center gap-1">
+              <span class="small text-muted" style="font-size:0.75rem;">Corridor Buffer:</span>
+              <span class="badge bg-light text-dark border">350m</span>
+            </div>
+          </div>
+
+          <button type="button" id="analyzeBtn" class="btn btn-primary w-100 fw-700 py-2 shadow-sm"
+                  style="background:var(--primary); border-color:var(--primary); border-radius:8px;">
+            <i class="fa fa-shield-virus me-2"></i>Analyze Corridor Safety
+          </button>
+        </div>
+
+        <!-- Safety Assessment Result Card -->
+        <div id="safetyResultCard" class="route-panel p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-700 mb-0 text-dark">
+              <i class="fa fa-clipboard-check me-2 text-primary"></i>Safety Assessment
+            </h6>
+            <span id="routeDistanceBadge" class="badge bg-secondary-subtle text-secondary border">0.0 km</span>
+          </div>
+
+          <!-- Score & Rating Banner -->
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3 mb-3" id="scoreBanner" style="background:#f1f5f9;">
+            <div class="score-dial flex-shrink-0" id="scoreDial" style="background:#2a9d8f;">
+              <span id="scoreValue" style="font-size:1.6rem; line-height:1;">100</span>
+              <span style="font-size:0.65rem; text-transform:uppercase;">Safety</span>
+            </div>
+            <div>
+              <div class="fw-800" id="ratingText" style="font-size:1.15rem; color:#2a9d8f;">Safe Corridor</div>
+              <p class="small mb-0 text-muted" id="advisoryText">Evaluating travel trajectory...</p>
+            </div>
+          </div>
+
+          <!-- Hazards Summary Count -->
+          <div class="d-flex justify-content-between align-items-center p-2 rounded mb-3" style="background:#f8f9fa;">
+            <span class="small text-muted fw-600">Active Hazards on Route:</span>
+            <span id="hazardCountBadge" class="badge bg-danger px-3 py-1">0 Hazards</span>
+          </div>
+
+          <!-- Itemized Hazards Along the Route -->
+          <div class="mt-3">
+            <h6 class="small fw-700 text-uppercase text-muted mb-2" style="letter-spacing:0.5px;">
+              Hazards Encountered Along Trajectory
+            </h6>
+            <div id="routeHazardsList" style="max-height: 250px; overflow-y: auto;">
+              <p class="small text-muted fst-italic">Click 'Analyze Corridor Safety' to compute.</p>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /col -->
+
+      <!-- RIGHT: Interactive Map -->
+      <div class="col-lg-7">
+        <div class="route-map-card">
+          <div id="routeMap"></div>
+        </div>
+      </div><!-- /col -->
+
+    </div><!-- /row -->
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   SafeRoad — SafeRoute Road Safety Engine JS
+   ============================================================ */
+
+const routeMap = L.map('routeMap').setView([17.4100, 78.4350], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(routeMap);
+
+let startMarker = null;
+let endMarker = null;
+let routePolyline = null;
+let hazardMarkersLayer = L.layerGroup().addTo(routeMap);
+let pinSelectionMode = null; // 'start' or 'end'
+
+const startIcon = L.divIcon({
+  className: '',
+  html: '<div style="background:#2a9d8f;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-weight:bold;font-size:12px;">A</div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
+const endIcon = L.divIcon({
+  className: '',
+  html: '<div style="background:#e63946;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-weight:bold;font-size:12px;">B</div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
+function initMarkers() {
+  const slat = parseFloat(document.getElementById('startLat').value);
+  const slng = parseFloat(document.getElementById('startLng').value);
+  const elat = parseFloat(document.getElementById('endLat').value);
+  const elng = parseFloat(document.getElementById('endLng').value);
+
+  if (startMarker) routeMap.removeLayer(startMarker);
+  if (endMarker) routeMap.removeLayer(endMarker);
+
+  startMarker = L.marker([slat, slng], { icon: startIcon, draggable: true }).addTo(routeMap);
+  endMarker = L.marker([elat, elng], { icon: endIcon, draggable: true }).addTo(routeMap);
+
+  startMarker.on('dragend', (e) => {
+    const pos = e.target.getLatLng();
+    document.getElementById('startLat').value = pos.lat.toFixed(5);
+    document.getElementById('startLng').value = pos.lng.toFixed(5);
+    document.getElementById('startInput').value = `Pinned [${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}]`;
+    analyzeRoute();
+  });
+
+  endMarker.on('dragend', (e) => {
+    const pos = e.target.getLatLng();
+    document.getElementById('endLat').value = pos.lat.toFixed(5);
+    document.getElementById('endLng').value = pos.lng.toFixed(5);
+    document.getElementById('endInput').value = `Pinned [${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}]`;
+    analyzeRoute();
+  });
+}
+
+function setMode(mode) {
+  pinSelectionMode = mode;
+  alert(`Click anywhere on the map to set point ${mode === 'start' ? 'A (Start)' : 'B (Destination)'}.`);
+}
+
+routeMap.on('click', (e) => {
+  if (pinSelectionMode === 'start') {
+    document.getElementById('startLat').value = e.latlng.lat.toFixed(5);
+    document.getElementById('startLng').value = e.latlng.lng.toFixed(5);
+    document.getElementById('startInput').value = `Map Point A (${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)})`;
+    startMarker.setLatLng(e.latlng);
+    pinSelectionMode = null;
+    analyzeRoute();
+  } else if (pinSelectionMode === 'end') {
+    document.getElementById('endLat').value = e.latlng.lat.toFixed(5);
+    document.getElementById('endLng').value = e.latlng.lng.toFixed(5);
+    document.getElementById('endInput').value = `Map Point B (${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)})`;
+    endMarker.setLatLng(e.latlng);
+    pinSelectionMode = null;
+    analyzeRoute();
+  }
+});
+
+function loadPresetRoute(routeData) {
+  document.getElementById('startInput').value = routeData.start.name;
+  document.getElementById('startLat').value = routeData.start.lat;
+  document.getElementById('startLng').value = routeData.start.lng;
+
+  document.getElementById('endInput').value = routeData.end.name;
+  document.getElementById('endLat').value = routeData.end.lat;
+  document.getElementById('endLng').value = routeData.end.lng;
+
+  initMarkers();
+  analyzeRoute();
+}
+
+async function fetchOsrmRoute(slat, slng, elat, elng) {
+  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${slng},${slat};${elng},${elat}?overview=full&geometries=geojson`;
+  try {
+    const resp = await fetch(osrmUrl);
+    const data = await resp.json();
+    if (data.routes && data.routes.length > 0) {
+      // OSRM coordinates are [lng, lat]
+      const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      return coords;
+    }
+  } catch (err) {
+    console.warn('OSRM routing failed, using linear corridor fallback:', err);
+  }
+  // Interpolated fallback trajectory
+  const steps = 15;
+  const fallback = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    fallback.push([slat + t * (elat - slat), slng + t * (elng - slng)]);
+  }
+  return fallback;
+}
+
+async function analyzeRoute() {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Computing Safety...';
+
+  const slat = parseFloat(document.getElementById('startLat').value);
+  const slng = parseFloat(document.getElementById('startLng').value);
+  const elat = parseFloat(document.getElementById('endLat').value);
+  const elng = parseFloat(document.getElementById('endLng').value);
+
+  const polyline = await fetchOsrmRoute(slat, slng, elat, elng);
+
+  // Render Route on Map
+  if (routePolyline) routeMap.removeLayer(routePolyline);
+  hazardMarkersLayer.clearLayers();
+
+  routePolyline = L.polyline(polyline, {
+    color: '#1d3557',
+    weight: 6,
+    opacity: 0.85
+  }).addTo(routeMap);
+
+  routeMap.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+
+  // Call SafeRoad Backend Safety Evaluator
+  try {
+    const resp = await fetch('/api/route-safety', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        polyline: polyline,
+        corridor_buffer_m: 400
+      })
+    });
+    const result = await resp.json();
+    displaySafetyAssessment(result);
+  } catch (err) {
+    console.error('Safety evaluation failed:', err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-shield-virus me-2"></i>Analyze Corridor Safety';
+  }
+}
+
+function displaySafetyAssessment(res) {
+  // Update Score & Rating Banner
+  document.getElementById('scoreValue').textContent = res.safety_score;
+  document.getElementById('ratingText').textContent = `${res.rating} (${res.rating_badge})`;
+  document.getElementById('ratingText').style.color = res.rating_color;
+  document.getElementById('scoreDial').style.background = res.rating_color;
+  document.getElementById('advisoryText').textContent = res.advisory;
+  document.getElementById('hazardCountBadge').textContent = `${res.hazard_count} Hazard(s)`;
+  document.getElementById('hazardCountBadge').className = `badge ${res.hazard_count > 0 ? 'bg-danger' : 'bg-success'} px-3 py-1`;
+  document.getElementById('routeDistanceBadge').textContent = `${res.route_distance_km} km`;
+
+  // Change polyline color to match rating
+  if (routePolyline) {
+    routePolyline.setStyle({ color: res.rating_color });
+  }
+
+  // Render Hazards List & Map Markers
+  const listEl = document.getElementById('routeHazardsList');
+  if (!res.hazards || res.hazards.length === 0) {
+    listEl.innerHTML = `
+      <div class="p-3 text-center rounded text-success" style="background:#e8f7f0;">
+        <i class="fa fa-circle-check fa-2x mb-1"></i>
+        <div class="fw-700">Clear Corridor</div>
+        <small>No active potholes or hazardous road defects detected within 400m of this route!</small>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = res.hazards.map(h => {
+    // Add pulsing hazard marker to map
+    const hlat = h.lat || h.latitude;
+    const hlng = h.lng || h.longitude;
+    const marker = L.circleMarker([hlat, hlng], {
+      radius: 9,
+      fillColor: '#e63946',
+      color: '#ffffff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
+    }).addTo(hazardMarkersLayer);
+
+    const stars = '★'.repeat(h.severity) + '☆'.repeat(5 - h.severity);
+    marker.bindPopup(`
+      <div style="font-size:0.85rem;">
+        <span class="badge bg-danger mb-1">${(h.category || 'Hazard').replace(/_/g, ' ')}</span>
+        <div class="fw-700 text-dark">${h.location_name}</div>
+        <div class="text-warning small my-1">${stars} (Severity ${h.severity}/5)</div>
+        <p class="text-muted small mb-2">${h.description || ''}</p>
+        <div class="small text-danger fw-600"><i class="fa fa-triangle-exclamation me-1"></i>${h.distance_to_route_m}m from travel path</div>
+        <a href="/my-reports?report_id=${h.report_id}" target="_blank" class="btn btn-sm btn-outline-secondary w-100 mt-2">Track Hazard</a>
+      </div>
+    `);
+
+    return `
+      <div class="hazard-timeline-item">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="badge bg-danger text-uppercase" style="font-size:0.7rem;">${(h.category||'').replace(/_/g, ' ')}</span>
+          <small class="text-muted fw-600">${h.distance_from_start_km} km into route</small>
+        </div>
+        <div class="fw-700 text-dark small mt-1">${h.location_name}</div>
+        <div class="small text-muted" style="line-height:1.4;">${h.description ? h.description.substring(0, 95) + '...' : ''}</div>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <span class="small text-danger" style="font-size:0.75rem;"><i class="fa fa-ruler me-1"></i>${h.distance_to_route_m}m from road</span>
+          <span class="text-warning small">${stars}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', analyzeRoute);
+
+// Initialize on page load
+initMarkers();
+analyzeRoute();
+</script>
+{% endblock %}

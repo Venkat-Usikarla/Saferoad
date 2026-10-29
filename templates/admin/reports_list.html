@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Admin Reports{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+  <div class="container-xl">
+
+    <!-- Heading -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h1 class="section-title mb-0"><i class="fa fa-list me-2 text-secondary"></i>All Reports</h1>
+        <p class="text-muted mb-0">Browse, search, filter and manage all hazard reports</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary fw-600">
+          <i class="fa fa-arrow-left me-1"></i>Dashboard
+        </a>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-danger fw-600">
+          <i class="fa fa-right-from-bracket me-1"></i>Logout
+        </a>
+      </div>
+    </div>
+
+    <!-- ===== SEARCH & FILTERS ===== -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+      <div class="card-body p-4">
+        <form method="GET" action="{{ url_for('admin_reports_list') }}" id="filterForm">
+          <div class="row g-3 align-items-end">
+            <!-- Search -->
+            <div class="col-md-4">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Search</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fa fa-magnifying-glass"></i></span>
+                <input type="text" name="q" class="form-control"
+                       placeholder="Name, email, location, report ID…"
+                       value="{{ request.args.get('q','') }}">
+              </div>
+            </div>
+            <!-- Category -->
+            <div class="col-md-2">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Category</label>
+              <select name="category" class="form-select form-select-sm">
+                <option value="">All Categories</option>
+                <option value="pothole"             {% if request.args.get('category')=='pothole' %}selected{% endif %}>🕳️ Pothole</option>
+                <option value="damaged_surface"     {% if request.args.get('category')=='damaged_surface' %}selected{% endif %}>🪨 Damaged Surface</option>
+                <option value="waterlogging"        {% if request.args.get('category')=='waterlogging' %}selected{% endif %}>💧 Waterlogging</option>
+                <option value="missing_crossing"    {% if request.args.get('category')=='missing_crossing' %}selected{% endif %}>🚶 Missing Crossing</option>
+                <option value="unsafe_intersection" {% if request.args.get('category')=='unsafe_intersection' %}selected{% endif %}>⚠️ Unsafe Intersection</option>
+                <option value="damaged_sign"        {% if request.args.get('category')=='damaged_sign' %}selected{% endif %}>🪧 Damaged Sign</option>
+                <option value="poor_lighting"       {% if request.args.get('category')=='poor_lighting' %}selected{% endif %}>💡 Poor Lighting</option>
+                <option value="other"               {% if request.args.get('category')=='other' %}selected{% endif %}>📋 Other</option>
+              </select>
+            </div>
+            <!-- Municipal Zone (Super Admin) -->
+            {% if role == 'super_admin' %}
+            <div class="col-md-2">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Division / Zone</label>
+              <select name="zone" class="form-select form-select-sm">
+                <option value="">All Zones</option>
+                {% for z in all_zones %}
+                <option value="{{ z.id }}" {% if selected_zone == z.id %}selected{% endif %}>{{ z.short_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <!-- Status -->
+            <div class="col-md-2">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Status</label>
+              <select name="status" class="form-select form-select-sm">
+                <option value="">All Statuses</option>
+                <option value="pending"      {% if request.args.get('status')=='pending' %}selected{% endif %}>Pending Review</option>
+                <option value="under_review" {% if request.args.get('status')=='under_review' %}selected{% endif %}>Under Review</option>
+                <option value="in_progress"  {% if request.args.get('status')=='in_progress' %}selected{% endif %}>Action in Progress</option>
+                <option value="resolved"     {% if request.args.get('status')=='resolved' %}selected{% endif %}>Resolved</option>
+                <option value="rejected"     {% if request.args.get('status')=='rejected' %}selected{% endif %}>Rejected</option>
+                <option value="duplicate"    {% if request.args.get('status')=='duplicate' %}selected{% endif %}>Duplicate</option>
+              </select>
+            </div>
+            <!-- Priority -->
+            <div class="col-md-2">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Priority</label>
+              <select name="priority" class="form-select form-select-sm">
+                <option value="">All Priorities</option>
+                <option value="low"    {% if request.args.get('priority')=='low' %}selected{% endif %}>Low</option>
+                <option value="medium" {% if request.args.get('priority')=='medium' %}selected{% endif %}>Medium</option>
+                <option value="high"   {% if request.args.get('priority')=='high' %}selected{% endif %}>High</option>
+              </select>
+            </div>
+            <!-- Sort -->
+            <div class="col-md-1">
+              <label class="form-label fw-600" style="font-size:0.85rem;">Sort by</label>
+              <select name="sort" class="form-select form-select-sm">
+                <option value="date"           {% if request.args.get('sort','date')=='date' %}selected{% endif %}>Date</option>
+                <option value="severity"       {% if request.args.get('sort')=='severity' %}selected{% endif %}>Severity</option>
+                <option value="priority_score" {% if request.args.get('sort')=='priority_score' %}selected{% endif %}>Priority Score</option>
+              </select>
+            </div>
+            <div class="col-md-1">
+              <button type="submit" class="btn w-100 fw-600"
+                      style="background:var(--primary);color:#fff;border-radius:8px;font-size:0.85rem;">
+                <i class="fa fa-filter"></i>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== REPORTS TABLE ===== -->
+    <div class="admin-table card">
+      <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center" style="background:var(--dark);">
+        <h6 class="mb-0 text-white fw-700">
+          Reports
+          <span class="badge bg-light text-dark ms-2">{{ total or 0 }}</span>
+        </h6>
+        <div class="text-white opacity-75" style="font-size:0.82rem;">
+          Page {{ page or 1 }} of {{ total_pages or 1 }}
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>Category</th>
+              <th>Location</th>
+              <th>Municipal Zone</th>
+              <th>Submitter</th>
+              <th>Severity</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if reports %}
+              {% for r in reports %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('admin_report_detail', report_id=r.report_id) }}"
+                     class="fw-700 text-decoration-none"
+                     style="color:var(--dark);font-size:0.85rem;">
+                    {{ r.report_id }}
+                  </a>
+                  {% if r.image_path %}
+                    <span class="badge bg-light text-primary border ms-1" title="Has citizen photo"><i class="fa fa-camera"></i></span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-warning text-dark" style="font-size:0.72rem;">
+                    {{ r.category | replace('_',' ') | title }}
+                  </span>
+                </td>
+                <td class="text-muted" style="font-size:0.85rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  {{ r.location_name or '—' }}
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark border" style="font-size:0.75rem;">
+                    {{ r.zone_name | replace(' Zone', '') if r.zone_name else 'Hyderabad' }}
+                  </span>
+                </td>
+                <td style="font-size:0.85rem;">
+                  <div class="fw-600">{{ r.submitter_name or '—' }}</div>
+                  <div class="text-muted" style="font-size:0.75rem;">{{ r.submitter_email or '' }}</div>
+                </td>
+                <td>
+                  <div class="severity-stars" style="font-size:0.72rem;">
+                    {% for i in range(1, 6) %}
+                      <i class="fa fa-star {% if i <= r.severity %}text-warning{% else %}text-secondary{% endif %}"></i>
+                    {% endfor %}
+                  </div>
+                </td>
+                <td>
+                  {% set p = (r.priority or 'low') | lower %}
+                  <span class="badge badge-priority-{{ p }}">{{ p | title }}</span>
+                </td>
+                <td>
+                  {% set s = (r.status or 'pending') | replace(' ', '_') | lower %}
+                  <span class="badge badge-status-{{ s }}" style="font-size:0.72rem;">{{ r.status | title }}</span>
+                </td>
+                <td class="text-muted" style="font-size:0.8rem;">
+                  {{ r.submitted_at.strftime('%d %b %Y') if r.submitted_at else '—' }}
+                </td>
+                <td>
+                  <a href="{{ url_for('admin_report_detail', report_id=r.report_id) }}"
+                     class="btn btn-sm fw-600"
+                     style="background:var(--secondary);color:#fff;border-radius:6px;font-size:0.78rem;">
+                    View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="text-center text-muted py-5">
+                  <i class="fa fa-inbox fa-2x mb-2 d-block"></i>No reports match your filters.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if total_pages and total_pages > 1 %}
+      <div class="card-footer bg-white border-top-0 px-4 py-3">
+        <nav aria-label="Reports pagination">
+          <ul class="pagination pagination-sm mb-0 justify-content-center">
+            <li class="page-item {% if (page or 1) <= 1 %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('admin_reports_list', page=(page or 1)-1, q=request.args.get('q', request.args.get('search', '')), category=request.args.get('category', ''), status=request.args.get('status', ''), priority=request.args.get('priority', ''), sort=request.args.get('sort', '')) }}">
+                <i class="fa fa-chevron-left"></i> Prev
+              </a>
+            </li>
+            {% for p in range(1, (total_pages or 1)+1) %}
+            <li class="page-item {% if p == (page or 1) %}active{% endif %}">
+              <a class="page-link" href="{{ url_for('admin_reports_list', page=p, q=request.args.get('q', request.args.get('search', '')), category=request.args.get('category', ''), status=request.args.get('status', ''), priority=request.args.get('priority', ''), sort=request.args.get('sort', '')) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+            <li class="page-item {% if (page or 1) >= (total_pages or 1) %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('admin_reports_list', page=(page or 1)+1, q=request.args.get('q', request.args.get('search', '')), category=request.args.get('category', ''), status=request.args.get('status', ''), priority=request.args.get('priority', ''), sort=request.args.get('sort', '')) }}">
+                Next <i class="fa fa-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+    </div><!-- /admin-table -->
+
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — View Hazard Map{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<style>
+  body { overflow: hidden; }
+  .saferoad-footer { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="map-page-wrapper">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="map-sidebar">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h5 class="mb-0"><i class="fa fa-sliders me-2 text-danger"></i>Filters</h5>
+      <button id="applyFilters" class="btn btn-sm fw-600"
+              style="background:var(--primary);color:#fff;border-radius:8px;font-size:0.8rem;">
+        Apply
+      </button>
+    </div>
+
+    <!-- Category -->
+    <div class="mb-3">
+      <h6 style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:700;">Category</h6>
+      <div id="catFilters">
+        {% set categories = [
+          ('pothole','🕳️','Pothole'),
+          ('damaged_surface','🪨','Damaged Surface'),
+          ('waterlogging','💧','Waterlogging'),
+          ('missing_crossing','🚶','Missing Crossing'),
+          ('unsafe_intersection','⚠️','Unsafe Intersection'),
+          ('damaged_sign','🪧','Damaged Sign'),
+          ('poor_lighting','💡','Poor Lighting'),
+          ('other','📋','Other')
+        ] %}
+        {% for slug, emoji, label in categories %}
+        <div class="form-check sidebar-check mb-1">
+          <input class="form-check-input cat-check" type="checkbox"
+                 id="cat_{{ slug }}" value="{{ slug }}" checked>
+          <label class="form-check-label" for="cat_{{ slug }}">{{ emoji }} {{ label }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <h6 class="mb-0" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:700;">Status</h6>
+        <span class="badge bg-danger text-white px-2 py-1" style="font-size:0.68rem;">Live Dangers</span>
+      </div>
+      <small class="text-muted d-block mb-2" style="font-size:0.72rem;line-height:1.4;">
+        Active hazards are shown by default. Once repaired, hazards leave the map (check 'Resolved' to view past fixes).
+      </small>
+      {% set statuses = [
+        ('in_progress','Action in Progress'),
+        ('under_review','Under Review'),
+        ('pending','Pending Review'),
+        ('resolved','Resolved (Repaired)'),
+        ('rejected','Rejected'),
+        ('duplicate','Duplicate')
+      ] %}
+      {% for slug, label in statuses %}
+      <div class="form-check sidebar-check mb-1">
+        <input class="form-check-input status-check" type="checkbox"
+               id="st_{{ slug }}" value="{{ slug }}"
+               {% if slug in ['in_progress', 'under_review'] %}checked{% endif %}>
+        <label class="form-check-label" for="st_{{ slug }}">
+          {{ label }}
+          {% if slug == 'in_progress' %}
+            <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;">Active</span>
+          {% elif slug == 'resolved' %}
+            <span class="badge bg-success text-white ms-1" style="font-size:0.65rem;">Fixed</span>
+          {% endif %}
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Priority -->
+    <div class="mb-3">
+      <h6 style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:700;">Priority</h6>
+      <div class="d-flex flex-wrap gap-1" id="priorityFilters">
+        <button class="priority-filter-btn active" data-priority="all">All</button>
+        <button class="priority-filter-btn" data-priority="low" style="color:#0a3622;border-color:#a3cfbb;">Low</button>
+        <button class="priority-filter-btn" data-priority="medium" style="color:#7d3300;border-color:#f4c28a;">Medium</button>
+        <button class="priority-filter-btn" data-priority="high" style="color:#58151c;border-color:#f1aeb5;">High</button>
+      </div>
+    </div>
+
+    <hr>
+    <div class="text-center">
+      <span class="report-count-badge">
+        <i class="fa fa-map-marker-alt me-1"></i>
+        Showing <span id="reportCount">0</span> reports
+      </span>
+    </div>
+
+    <div class="mt-3">
+      <a href="{{ url_for('report_hazard') }}" class="btn w-100 fw-600"
+         style="background:var(--primary);color:#fff;border-radius:8px;font-size:0.85rem;">
+        <i class="fa fa-plus me-1"></i>Report a Hazard
+      </a>
+    </div>
+  </aside>
+  <!-- ===== END SIDEBAR ===== -->
+
+  <!-- ===== MAIN MAP ===== -->
+  <div class="map-main">
+    <div id="mainMap"></div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <h6>Category Legend</h6>
+      <div class="legend-item"><span class="legend-dot" style="background:#e63946;"></span>Pothole</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f4a261;"></span>Damaged Surface</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#457b9d;"></span>Waterlogging</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#8338ec;"></span>Missing Crossing</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#6b0000;"></span>Unsafe Intersection</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#ffbe0b;"></span>Damaged Sign</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#6c757d;"></span>Poor Lighting</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#2a9d8f;"></span>Other</div>
+    </div>
+  </div>
+  <!-- ===== END MAIN MAP ===== -->
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+/* ============================================================
+   SafeRoad — Map Page JS
+   ============================================================ */
+
+const CATEGORY_COLORS = {
+  pothole:             '#e63946',
+  damaged_surface:     '#f4a261',
+  waterlogging:        '#457b9d',
+  missing_crossing:    '#8338ec',
+  unsafe_intersection: '#6b0000',
+  damaged_sign:        '#ffbe0b',
+  poor_lighting:       '#6c757d',
+  other:               '#2a9d8f'
+};
+
+const STATUS_BADGE_CLASSES = {
+  pending:            'badge-status-pending',
+  pending_review:     'badge-status-pending',
+  under_review:       'badge-status-under_review',
+  in_progress:        'badge-status-in_progress',
+  action_in_progress: 'badge-status-in_progress',
+  resolved:           'badge-status-resolved',
+  rejected:           'badge-status-rejected',
+  duplicate:          'badge-status-duplicate'
+};
+
+const PRIORITY_BADGE_CLASSES = {
+  low:    'badge-priority-low',
+  medium: 'badge-priority-medium',
+  high:   'badge-priority-high'
+};
+
+/* ---- Init map (Centered on Hyderabad) ---- */
+const map = L.map('mainMap', { zoomControl: true }).setView([17.3850, 78.4867], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+let clusterGroup = L.markerClusterGroup({ maxClusterRadius: 50 });
+map.addLayer(clusterGroup);
+
+/* ---- Pre-select category from URL ---- */
+const urlParams  = new URLSearchParams(window.location.search);
+const urlCat     = urlParams.get('category');
+if (urlCat) {
+  document.querySelectorAll('.cat-check').forEach(cb => {
+    cb.checked = (cb.value === urlCat);
+  });
+}
+
+/* ---- Priority filter ---- */
+let selectedPriority = 'all';
+document.querySelectorAll('.priority-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.priority-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedPriority = btn.dataset.priority;
+  });
+});
+
+/* ---- Build popup HTML ---- */
+function buildPopup(r) {
+  const stars = Array.from({length:5}, (_,i) =>
+    `<i class="fa fa-star ${i < r.severity ? 'text-warning' : 'text-secondary'}" style="font-size:.75rem;"></i>`
+  ).join('');
+  const catLabel = (r.category||'').replace(/_/g,' ');
+  const statusKey = (r.status||'').replace(/ /g,'_').toLowerCase();
+  const priorityKey = (r.priority||r.priority_level||'low').toLowerCase();
+  const desc = r.description ? (r.description.length > 80 ? r.description.slice(0,80)+'…' : r.description) : '';
+  const confirms = r.confirmation_count || (r.confirmations ? r.confirmations.length : 0);
+  
+  let reviewHtml = '';
+  if (r.confirmations && r.confirmations.length > 0) {
+    const firstReview = r.confirmations.find(c => c.comment) || r.confirmations[0];
+    if (firstReview && firstReview.comment) {
+      reviewHtml = `
+        <div class="mt-2 p-2 rounded" style="background:#f0f7ff;font-size:.75rem;border-left:3px solid #1a73e8;">
+          <i class="fa fa-comment-dots text-primary me-1"></i><strong>Review:</strong> "${firstReview.comment}"
+          <div class="text-muted" style="font-size:.7rem;">— ${firstReview.confirmer_name}</div>
+        </div>`;
+    }
+  }
+
+  return `
+    <div class="popup-title">${r.report_id || 'N/A'}</div>
+    <div class="mb-1">
+      <span class="badge bg-warning text-dark" style="font-size:.7rem;">${catLabel}</span>
+      <span class="badge ms-1 ${STATUS_BADGE_CLASSES[statusKey] || 'bg-secondary'}" style="font-size:.7rem;">${r.status || ''}</span>
+      <span class="badge ms-1 ${PRIORITY_BADGE_CLASSES[priorityKey] || ''}" style="font-size:.7rem;">${r.priority || r.priority_level || ''}</span>
+    </div>
+    <div class="text-muted" style="font-size:.8rem;"><i class="fa fa-location-dot me-1 text-danger"></i>${r.location_name || 'Unknown'}</div>
+    <div class="my-1">${stars} <small class="text-muted">${r.severity}/5</small> · <small class="text-primary fw-600"><i class="fa fa-users me-1"></i>${confirms} confirmed</small></div>
+    ${desc ? `<p style="font-size:.8rem;color:#555;margin:.4rem 0;">${desc}</p>` : ''}
+    ${reviewHtml}
+    <a href="/my-reports?report_id=${r.report_id}" class="btn btn-sm fw-600 mt-2 w-100"
+       style="background:var(--dark);color:#fff;border-radius:6px;font-size:.78rem;">
+       <i class="fa fa-arrow-right me-1"></i>View Details & Reviews
+    </a>
+  `;
+}
+
+/* ---- Load & render reports ---- */
+async function loadReports() {
+  const cats = [...document.querySelectorAll('.cat-check:checked')].map(c => c.value);
+  const statuses = [...document.querySelectorAll('.status-check:checked')].map(c => c.value);
+
+  const params = new URLSearchParams();
+  cats.forEach(c => params.append('category', c));
+  statuses.forEach(s => params.append('status', s));
+  if (selectedPriority !== 'all') params.set('priority', selectedPriority);
+
+  clusterGroup.clearLayers();
+
+  try {
+    const resp = await fetch(`/api/reports?${params.toString()}`);
+    const data = await resp.json();
+    const reports = Array.isArray(data) ? data : (data.reports || []);
+
+    document.getElementById('reportCount').textContent = reports.length;
+
+    reports.forEach(r => {
+      const lat = r.lat ?? r.latitude;
+      const lng = r.lng ?? r.longitude;
+      if (!lat || !lng) return;
+      const color  = CATEGORY_COLORS[r.category] || '#999';
+      const circle = L.circleMarker([lat, lng], {
+        radius:      9,
+        fillColor:   color,
+        color:       '#fff',
+        weight:      2,
+        opacity:     1,
+        fillOpacity: 0.9
+      });
+      circle.bindPopup(buildPopup(r), { maxWidth: 280 });
+      clusterGroup.addLayer(circle);
+    });
+
+    if (clusterGroup.getLayers().length > 0) {
+      setTimeout(() => {
+        map.invalidateSize();
+        map.fitBounds(clusterGroup.getBounds(), { padding: [50, 50], maxZoom: 14 });
+      }, 150);
+    }
+  } catch(err) {
+    console.warn('Failed to load reports:', err);
+    document.getElementById('reportCount').textContent = '0';
+  }
+}
+
+document.getElementById('applyFilters').addEventListener('click', loadReports);
+loadReports();
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Launch a Road Safety Petition{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .new-petition-page { padding: 40px 0 70px; background: #f8fafc; }
+  .form-card { border: none; border-radius: var(--radius); box-shadow: var(--card-shadow); background: #fff; }
+  #miniPinMap { height: 260px; border-radius: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="new-petition-page">
+  <div class="container-xl" style="max-width: 860px;">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="{{ url_for('petitions_list') }}">Petitions</a></li>
+        <li class="breadcrumb-item active">Start a Petition</li>
+      </ol>
+    </nav>
+
+    <div class="card form-card p-4 p-md-5">
+
+      <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+        <div style="font-size:2.4rem;">📢</div>
+        <div>
+          <span class="badge bg-danger text-uppercase mb-1 fw-700" style="font-size:0.7rem; letter-spacing:0.5px;">Civil Action Campaign</span>
+          <h2 class="fw-800 text-dark mb-0">Start a Road Safety Petition</h2>
+          <p class="text-muted small mb-0">Mobilize neighbors and commuters to demand infrastructure repairs from GHMC authorities.</p>
+        </div>
+      </div>
+
+      <!-- Flash / Validation Alert -->
+      <div id="petitionFormAlert" class="alert d-none small mb-4" style="border-radius:8px;"></div>
+
+      <form id="newPetitionForm" method="POST" action="{{ url_for('create_petition') }}">
+        
+        <!-- Campaign Title -->
+        <div class="mb-3">
+          <label class="form-label fw-700 text-dark">Petition Title <span class="text-danger">*</span></label>
+          <input type="text" name="title" id="petitionTitle" class="form-control"
+                 placeholder="e.g. Urgent Re-carpeting of Deep Craters on Cyber Towers Flyover Ramp"
+                 value="{{ prefill.title if prefill else '' }}" required>
+          <div class="form-text small">Make it specific, action-oriented and mention the exact location.</div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <!-- Category -->
+          <div class="col-md-6">
+            <label class="form-label fw-700 text-dark">Hazard Category <span class="text-danger">*</span></label>
+            <select name="category" class="form-select" required>
+              {% for slug, label in hazard_categories %}
+              <option value="{{ slug }}" {% if prefill and prefill.category == slug %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Target Signature Goal -->
+          <div class="col-md-6">
+            <label class="form-label fw-700 text-dark">Signature Goal <span class="text-danger">*</span></label>
+            <select name="target_signatures" class="form-select" required>
+              <option value="25">25 Signatures (Local Street / Residential)</option>
+              <option value="50" selected>50 Signatures (Major Sub-Arterial Road)</option>
+              <option value="100">100 Signatures (High Traffic Junction / Flyover)</option>
+              <option value="250">250 Signatures (City Highway / Key Metro Corridor)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="mb-3">
+          <label class="form-label fw-700 text-dark">Location / Landmark <span class="text-danger">*</span></label>
+          <input type="text" name="location_name" id="locationInput" class="form-control"
+                 placeholder="e.g. Cyber Towers Junction, Hitec City, Hyderabad"
+                 value="{{ prefill.location_name if prefill else '' }}" required>
+        </div>
+
+        <!-- Optional Pin Map & Jurisdiction Card -->
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label fw-700 text-dark mb-0">Pin Location on Hyderabad Map (Optional)</label>
+            <small class="text-muted">Click map to adjust</small>
+          </div>
+          <div id="miniPinMap" class="mb-2"></div>
+          <input type="hidden" name="lat" id="latInput" value="{{ prefill.lat if prefill and prefill.lat else '17.4485' }}">
+          <input type="hidden" name="lng" id="lngInput" value="{{ prefill.lng if prefill and prefill.lng else '78.3750' }}">
+
+          <!-- Auto-detected Zone Box -->
+          <div class="p-3 rounded-3" style="background:#eef6fc; border-left:4px solid #1d3557;">
+            <div class="small text-uppercase fw-700 text-primary" style="font-size:0.72rem;">Assigned GHMC Jurisdiction</div>
+            <div class="fw-700 text-dark" id="zoneDisplay">Serilingampally Zone (West)</div>
+            <div class="small text-muted" id="officerDisplay">Superintending Engineer: Er. K. V. Rao &bull; GHMC Cyber Towers Circle</div>
+          </div>
+        </div>
+
+        <!-- The Story / Argument -->
+        <div class="mb-4">
+          <label class="form-label fw-700 text-dark">Why Does This Hazard Demand Immediate Action? <span class="text-danger">*</span></label>
+          <textarea name="story" id="petitionStory" class="form-control" rows="5"
+                    placeholder="Describe the danger to pedestrians, two-wheelers, or ambulance traffic. Mention how long the hazard has existed and any accidents or near-misses observed... (Filtered for respectful civic language, min 40 characters)"
+                    minlength="40" required>{{ prefill.description if prefill else '' }}</textarea>
+          <div class="form-text small">Explain why municipal road engineers must prioritize this specific repair.</div>
+        </div>
+
+        <!-- Creator Details -->
+        <h5 class="fw-700 text-dark pt-3 border-top mb-3">Campaign Organizer Information</h5>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label fw-700 text-muted small">Your Name <span class="text-danger">*</span></label>
+            <input type="text" name="creator_name" class="form-control form-control-sm"
+                   value="{{ prefill.submitter_name if prefill else '' }}" placeholder="Full Name" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-700 text-muted small">Email Address <span class="text-danger">*</span></label>
+            <input type="email" name="creator_email" class="form-control form-control-sm"
+                   value="{{ prefill.submitter_email if prefill else '' }}" placeholder="Email" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-700 text-muted small">Phone Number (Optional)</label>
+            <input type="tel" name="creator_phone" class="form-control form-control-sm" placeholder="+91...">
+          </div>
+        </div>
+
+        {% if prefill and prefill.report_id %}
+        <input type="hidden" name="report_id" value="{{ prefill.report_id }}">
+        <div class="alert alert-light border small mb-4">
+          <i class="fa fa-link text-primary me-2"></i>This petition is linked to existing verified Report <strong>#{{ prefill.report_id }}</strong>.
+        </div>
+        {% endif %}
+
+        <button type="submit" id="submitPetitionBtn" class="btn btn-danger w-100 fw-700 py-3 shadow-sm"
+                style="border-radius:10px; font-size:1.1rem;">
+          <i class="fa fa-rocket me-2"></i>Publish Petition &amp; Start Gathering Signatures
+        </button>
+
+      </form>
+
+    </div>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const miniMap = L.map('miniPinMap').setView([17.4485, 78.3750], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OSM',
+  maxZoom: 18
+}).addTo(miniMap);
+
+let pinMarker = L.marker([17.4485, 78.3750], { draggable: true }).addTo(miniMap);
+
+function updateZone(lat, lng, loc) {
+  fetch(`/api/detect-zone?lat=${lat || ''}&lng=${lng || ''}&location=${encodeURIComponent(loc || '')}`)
+    .then(r => r.json())
+    .then(z => {
+      if (z && z.name) {
+        document.getElementById('zoneDisplay').textContent = z.name;
+        document.getElementById('officerDisplay').innerHTML = `Jurisdiction: <strong>${z.officer_name}</strong> &bull; ${z.office_address}`;
+      }
+    })
+    .catch(() => {});
+}
+
+pinMarker.on('dragend', (e) => {
+  const pos = e.target.getLatLng();
+  document.getElementById('latInput').value = pos.lat.toFixed(5);
+  document.getElementById('lngInput').value = pos.lng.toFixed(5);
+  updateZone(pos.lat, pos.lng, document.getElementById('locationInput').value);
+});
+
+miniMap.on('click', (e) => {
+  pinMarker.setLatLng(e.latlng);
+  document.getElementById('latInput').value = e.latlng.lat.toFixed(5);
+  document.getElementById('lngInput').value = e.latlng.lng.toFixed(5);
+  updateZone(e.latlng.lat, e.latlng.lng, document.getElementById('locationInput').value);
+});
+
+document.getElementById('locationInput').addEventListener('input', (e) => {
+  updateZone(document.getElementById('latInput').value, document.getElementById('lngInput').value, e.target.value);
+});
+</script>
+{% endblock %}

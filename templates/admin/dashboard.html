@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Admin Dashboard{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+  <div class="container-xl">
+
+    <!-- Administrative Jurisdiction & Profile Banner -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:12px; background:linear-gradient(135deg, #1d3557 0%, #2b4c7e 100%); color:#fff;">
+      <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge px-3 py-1 fw-700" style="background:{% if role == 'super_admin' %}#e63946{% else %}#2a9d8f{% endif %}; font-size:0.82rem; letter-spacing:0.5px;">
+              {% if role == 'super_admin' %}🏛️ CHIEF MUNICIPAL COMMISSIONER (SUPER ADMIN){% else %}📍 REGIONAL CIRCLE ADMINISTRATOR{% endif %}
+            </span>
+            <span class="badge bg-light text-dark fw-600" style="font-size:0.8rem;">
+              {{ session.admin_zone_name or 'City-wide Jurisdiction' }}
+            </span>
+          </div>
+          <h4 class="fw-800 mb-1" style="color:#ffffff;">
+            {{ session.admin_officer_name or 'Officer in Charge' }}
+          </h4>
+          <p class="mb-0 text-white-50 small">
+            {{ session.admin_title or 'Administrative Controller' }} &bull; SafeRoad Municipal Monitoring Cell
+          </p>
+        </div>
+
+        {% if role == 'super_admin' %}
+        <!-- Zone Filter for Super Admin -->
+        <div class="bg-white p-2 rounded-3 text-dark shadow-sm" style="min-width:260px;">
+          <label class="form-label mb-1 fw-700 text-muted" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+            <i class="fa fa-filter me-1 text-danger"></i>Filter Jurisdiction
+          </label>
+          <select class="form-select form-select-sm fw-600" onchange="location.href='{{ url_for('admin_dashboard') }}?zone=' + this.value">
+            <option value="all" {% if not selected_zone or selected_zone == 'all' %}selected{% endif %}>
+              All Zones (City-Wide Overview)
+            </option>
+            {% for z in all_zones %}
+            <option value="{{ z.id }}" {% if selected_zone == z.id %}selected{% endif %}>
+              {{ z.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <div class="text-end text-white-50 small">
+          <i class="fa fa-shield me-1 text-warning"></i>Access limited to <strong>{{ session.admin_zone_name }}</strong>.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Page heading -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h2 class="section-title mb-0" style="font-size:1.6rem;"><i class="fa fa-gauge me-2 text-danger"></i>Dashboard Overview</h2>
+        <p class="text-muted mb-0">Live municipal hazard status and operational metrics</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('admin_petitions') }}" class="btn btn-warning text-dark fw-bold"
+           style="border-radius:8px;">
+          <i class="fa fa-bullhorn me-1"></i>Citizen Petitions
+        </a>
+        <a href="{{ url_for('admin_reports_list') }}" class="btn fw-600"
+           style="background:var(--dark);color:#fff;border-radius:8px;">
+          <i class="fa fa-list me-2"></i>View Reports
+        </a>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-danger fw-600"
+           style="border-radius:8px;">
+          <i class="fa fa-right-from-bracket me-1"></i>Logout
+        </a>
+      </div>
+    </div>
+
+    <!-- ===== STATS ROW ===== -->
+    <div class="row g-4 mb-4">
+      <div class="col-sm-6 col-xl-3">
+        <div class="admin-stats-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#dbeafe;color:#1d4ed8;">
+            <i class="fa fa-clipboard-list fa-lg"></i>
+          </div>
+          <div>
+            <div class="stat-value">{{ stats.total_reports if stats else 0 }}</div>
+            <div class="stat-label">Total Reports</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="admin-stats-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#fef9c3;color:#a16207;">
+            <i class="fa fa-clock fa-lg"></i>
+          </div>
+          <div>
+            <div class="stat-value">{{ stats.pending if stats else 0 }}</div>
+            <div class="stat-label">Pending Review</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="admin-stats-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#fee2e2;color:#b91c1c;">
+            <i class="fa fa-fire-flame-curved fa-lg"></i>
+          </div>
+          <div>
+            <div class="stat-value">{{ stats.high_priority if stats else 0 }}</div>
+            <div class="stat-label">High Priority</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <div class="admin-stats-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#d1fae5;color:#065f46;">
+            <i class="fa fa-circle-check fa-lg"></i>
+          </div>
+          <div>
+            <div class="stat-value">{{ stats.resolved if stats else 0 }}</div>
+            <div class="stat-label">Resolved</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /stats row -->
+
+    <!-- ===== CHARTS ROW ===== -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-5">
+        <div class="chart-card h-100">
+          <h6><i class="fa fa-chart-pie me-2 text-secondary"></i>Reports by Category</h6>
+          <div style="position:relative;height:280px;">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="chart-card h-100">
+          <h6><i class="fa fa-chart-bar me-2 text-secondary"></i>Reports by Status</h6>
+          <div style="position:relative;height:280px;">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RECENT REPORTS TABLE ===== -->
+    <div class="admin-table card">
+      <div class="card-header d-flex justify-content-between align-items-center py-3 px-4" style="background:var(--dark);">
+        <h6 class="mb-0 text-white fw-700"><i class="fa fa-clock-rotate-left me-2"></i>Recent Reports</h6>
+        <a href="{{ url_for('admin_reports_list') }}" class="btn btn-sm btn-outline-light fw-600">
+          View All Reports <i class="fa fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>Category</th>
+              <th>Location</th>
+              <th>Severity</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if stats and stats.recent_reports %}
+              {% for r in stats.recent_reports %}
+              <tr>
+                <td><span class="fw-700" style="color:var(--dark);font-size:0.85rem;">{{ r.report_id }}</span></td>
+                <td>
+                  <span class="badge bg-warning text-dark" style="font-size:0.72rem;">
+                    {{ r.category | replace('_', ' ') | title }}
+                  </span>
+                </td>
+                <td class="text-muted" style="font-size:0.85rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  {{ r.location_name or '—' }}
+                </td>
+                <td>
+                  <div class="severity-stars" style="font-size:0.75rem;">
+                    {% for i in range(1, 6) %}
+                      <i class="fa fa-star {% if i <= r.severity %}text-warning{% else %}text-secondary{% endif %}"></i>
+                    {% endfor %}
+                  </div>
+                </td>
+                <td>
+                  {% set p = (r.priority or 'low') | lower %}
+                  <span class="badge badge-priority-{{ p }}">{{ p | title }}</span>
+                </td>
+                <td>
+                  {% set s = (r.status or 'pending') | replace(' ', '_') | lower %}
+                  <span class="badge badge-status-{{ s }}" style="font-size:0.72rem;">{{ r.status | title }}</span>
+                </td>
+                <td class="text-muted" style="font-size:0.82rem;">
+                  {{ r.submitted_at.strftime('%d %b %Y') if r.submitted_at else '—' }}
+                </td>
+                <td>
+                  <a href="{{ url_for('admin_report_detail', report_id=r.report_id) }}"
+                     class="btn btn-sm fw-600"
+                     style="background:var(--secondary);color:#fff;border-radius:6px;font-size:0.78rem;">
+                    View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" class="text-center text-muted py-5">
+                  <i class="fa fa-inbox fa-2x mb-2 d-block"></i>No reports found.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if role == 'super_admin' and zonal_performance %}
+    <!-- ===== ZONAL PERFORMANCE & CIRCLE ADMIN AUDIT ===== -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+      <div class="card-header d-flex justify-content-between align-items-center py-3 px-4"
+           style="background:var(--dark);color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+        <div>
+          <h5 class="mb-0 fw-700">
+            <i class="fa fa-chart-pie me-2 text-warning"></i>GHMC Zonal Divisions & Circle Admin Performance
+          </h5>
+          <small class="text-white-50">Comparative progress tracking across all 6 Hyderabad municipal zones</small>
+        </div>
+        <span class="badge bg-danger">Central Oversight</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" style="font-size:0.87rem;">
+          <thead style="background:#f8f9fa;">
+            <tr>
+              <th style="padding:1rem;">Division / Zone</th>
+              <th>Circle Engineer in Charge</th>
+              <th class="text-center">Total</th>
+              <th class="text-center">Pending</th>
+              <th class="text-center">In Progress</th>
+              <th class="text-center">Resolved</th>
+              <th style="min-width:140px;">Resolution %</th>
+              <th class="text-end" style="padding-right:1rem;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for zp in zonal_performance %}
+            <tr>
+              <td style="padding:1rem;">
+                <div class="fw-700 text-dark">{{ zp.zone_name }}</div>
+                <small class="text-muted"><i class="fa fa-building me-1"></i>{{ zp.office_address }}</small>
+              </td>
+              <td>
+                <div class="fw-600">{{ zp.officer_name }}</div>
+                <small class="text-muted">{{ zp.officer_title }}</small>
+              </td>
+              <td class="text-center"><span class="badge bg-secondary">{{ zp.total }}</span></td>
+              <td class="text-center"><span class="badge bg-warning text-dark">{{ zp.pending }}</span></td>
+              <td class="text-center"><span class="badge bg-primary">{{ zp.in_progress }}</span></td>
+              <td class="text-center"><span class="badge bg-success">{{ zp.resolved }}</span></td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:8px; border-radius:4px; background:#e9ecef;">
+                    <div class="progress-bar bg-success" style="width: {{ zp.resolution_rate }}%;"></div>
+                  </div>
+                  <span class="fw-700 text-success" style="font-size:0.8rem;">{{ zp.resolution_rate }}%</span>
+                </div>
+              </td>
+              <td class="text-end" style="padding-right:1rem;">
+                <a href="{{ url_for('admin_reports_list') }}?zone={{ zp.zone_id }}" class="btn btn-sm btn-outline-primary fw-600">
+                  <i class="fa fa-eye me-1"></i>Inspect Zone
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== ZONAL ADMIN CREDENTIALS DIRECTORY ===== -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--radius);">
+      <div class="card-header d-flex justify-content-between align-items-center py-3 px-4"
+           style="background:#343a40;color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+        <div>
+          <h5 class="mb-0 fw-700"><i class="fa fa-key me-2 text-warning"></i>Zonal Administrators Credentials Directory</h5>
+          <small class="text-white-50">Chief Commissioner credential audit panel for all 6 regional circles</small>
+        </div>
+        <span class="badge bg-info text-dark">Audit Directory</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:0.85rem;">
+          <thead style="background:#f1f3f5;">
+            <tr>
+              <th style="padding:0.85rem 1rem;">Jurisdiction</th>
+              <th>Officer Name & Title</th>
+              <th>Username</th>
+              <th>Password</th>
+              <th>Zonal Contact Email</th>
+              <th class="text-center">Role Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cred in admin_credentials %}
+            <tr>
+              <td style="padding:0.85rem 1rem;">
+                <span class="fw-700 text-dark">{{ cred.zone_name }}</span>
+              </td>
+              <td>
+                <div class="fw-600">{{ cred.officer_name }}</div>
+                <small class="text-muted">{{ cred.title }}</small>
+              </td>
+              <td><code class="bg-light px-2 py-1 rounded text-primary fw-700">{{ cred.username }}</code></td>
+              <td><code class="bg-light px-2 py-1 rounded text-danger fw-700">{{ cred.password }}</code></td>
+              <td><small class="text-muted">{{ cred.email }}</small></td>
+              <td class="text-center">
+                <span class="badge {% if cred.role == 'super_admin' %}bg-danger{% else %}bg-primary{% endif %} px-2 py-1">
+                  {{ cred.role_label }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+/* ============================================================
+   SafeRoad — Admin Dashboard Charts
+   ============================================================ */
+
+const statsData = {{ stats | tojson if stats else '{}' }};
+
+/* ---- Category Doughnut ---- */
+(function() {
+  const catData = statsData.by_category || {};
+  const labels  = Object.keys(catData).map(k => k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()));
+  const values  = Object.values(catData);
+  const colors  = [
+    '#e63946','#f4a261','#457b9d','#8338ec',
+    '#6b0000','#ffbe0b','#6c757d','#2a9d8f'
+  ];
+
+  const ctx = document.getElementById('categoryChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            font: { family: 'Inter', size: 11 },
+            boxWidth: 12,
+            padding: 10
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed} reports`
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ---- Status Bar Chart ---- */
+(function() {
+  const statusData = statsData.by_status || {};
+  const labelMap = {
+    pending:      'Pending Review',
+    under_review: 'Under Review',
+    in_progress:  'Action in Progress',
+    resolved:     'Resolved',
+    rejected:     'Rejected',
+    duplicate:    'Duplicate'
+  };
+  const colorMap = {
+    pending:      '#fbbf24',
+    under_review: '#60a5fa',
+    in_progress:  '#fb923c',
+    resolved:     '#34d399',
+    rejected:     '#f87171',
+    duplicate:    '#9ca3af'
+  };
+
+  const keys   = Object.keys(statusData);
+  const labels = keys.map(k => labelMap[k] || k);
+  const values = keys.map(k => statusData[k]);
+  const colors = keys.map(k => colorMap[k] || '#999');
+
+  const ctx2 = document.getElementById('statusChart').getContext('2d');
+  new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Reports',
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y} reports`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Inter', size: 11 } }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f0f0f0' },
+          ticks: {
+            stepSize: 1,
+            font: { family: 'Inter', size: 11 }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

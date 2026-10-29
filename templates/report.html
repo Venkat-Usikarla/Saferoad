@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Report a Hazard{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #reportMap { height: 350px; border-radius: 0 0 12px 12px; }
+  .map-instructions {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px 8px 0 0;
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #856404;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="report-page">
+  <div class="container-xl">
+    <div class="mb-4">
+      <h1 class="section-title">Report a Road Hazard</h1>
+      <p class="text-muted">Fill in the form below and pin the location on the map. Our team will review and act.</p>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- ===== LEFT: Form ===== -->
+      <div class="col-lg-7">
+        <div class="form-card card">
+          <div class="card-header">
+            <h5 class="mb-0 fw-700"><i class="fa fa-triangle-exclamation me-2"></i>Hazard Details</h5>
+          </div>
+          <div class="card-body p-4">
+            <form id="reportForm" enctype="multipart/form-data" novalidate>
+
+              <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                  <label class="form-label" for="submitterName">Your Name <span class="text-danger">*</span></label>
+                  <input type="text" id="submitterName" name="submitter_name"
+                         class="form-control" placeholder="Full name" required>
+                  <div class="invalid-feedback">Please enter your name.</div>
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label" for="submitterEmail">Email Address <span class="text-danger">*</span></label>
+                  <input type="email" id="submitterEmail" name="submitter_email"
+                         class="form-control" placeholder="you@example.com" required>
+                  <div class="invalid-feedback">Please enter a valid email.</div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="hazardCategory">Hazard Category <span class="text-danger">*</span></label>
+                <select id="hazardCategory" name="category" class="form-select" required>
+                  <option value="" disabled selected>— Select a category —</option>
+                  <option value="pothole">🕳️ Pothole</option>
+                  <option value="damaged_surface">🪨 Damaged Road Surface</option>
+                  <option value="waterlogging">💧 Waterlogging / Flooding</option>
+                  <option value="missing_crossing">🚶 Missing Pedestrian Crossing</option>
+                  <option value="unsafe_intersection">⚠️ Unsafe Intersection</option>
+                  <option value="damaged_sign">🪧 Damaged / Missing Road Sign</option>
+                  <option value="poor_lighting">💡 Poor Street Lighting</option>
+                  <option value="other">📋 Other Hazard</option>
+                </select>
+                <div class="invalid-feedback">Please select a category.</div>
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label" for="severitySlider">
+                  Severity Level
+                  <span id="severityBadge" class="severity-badge severity-3 ms-2">3 – Moderate</span>
+                </label>
+                <input type="range" id="severitySlider" name="severity"
+                       class="form-range severity-slider" min="1" max="5" step="1" value="3">
+                <div class="d-flex justify-content-between text-muted" style="font-size:0.75rem;">
+                  <span>1 – Minor</span>
+                  <span>3 – Moderate</span>
+                  <span>5 – Critical</span>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="locationName">Location / Landmark <span class="text-danger">*</span></label>
+                <input type="text" id="locationName" name="location_name"
+                       class="form-control" placeholder="e.g. Near SBI ATM, MG Road" required>
+                <div class="invalid-feedback">Please enter a location.</div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <label class="form-label" for="latField">Latitude</label>
+                  <input type="number" id="latField" name="latitude"
+                         class="form-control" placeholder="Click map →" step="any" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="lngField">Longitude</label>
+                  <input type="number" id="lngField" name="longitude"
+                         class="form-control" placeholder="Click map →" step="any" readonly>
+                </div>
+              </div>
+
+              <!-- Auto-detected GHMC Jurisdiction -->
+              <div id="zonalJurisdictionCard" class="card border-0 mb-3" style="background:#eef6fc; border-radius:10px; border-left:4px solid #1d3557;">
+                <div class="card-body p-3">
+                  <div class="d-flex align-items-center">
+                    <span style="font-size:1.8rem; margin-right:12px;">🏛️</span>
+                    <div>
+                      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:#457b9d; letter-spacing:0.5px;">
+                        Assigned Municipal Jurisdiction (GHMC)
+                      </div>
+                      <div id="zoneNameText" class="fw-700 text-dark" style="font-size:0.95rem;">
+                        Serilingampally Zone (West)
+                      </div>
+                      <div id="zoneOfficerText" class="text-muted" style="font-size:0.8rem;">
+                        <i class="fa fa-user-shield me-1 text-primary"></i>Jurisdiction: Er. K. V. Rao &bull; GHMC Cyber Towers Circle
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" for="description">Description <span class="text-danger">*</span></label>
+                <textarea id="description" name="description" class="form-control"
+                          rows="4" placeholder="Describe the hazard in detail (minimum 20 characters)…"
+                          minlength="20" required></textarea>
+                <div class="invalid-feedback">Please describe the hazard (min 20 characters).</div>
+                <div class="form-text">
+                  <span id="descCount">0</span>/500 characters
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label" for="photoInput">Upload Photo (optional)</label>
+                <input type="file" id="photoInput" name="photo" class="form-control" accept="image/*">
+                <!-- Image preview -->
+                <div id="imgPreviewWrapper" class="img-preview-wrapper mt-2 d-none">
+                  <img id="imgPreview" src="" alt="Preview" class="img-fluid">
+                  <button type="button" id="removePhoto" class="btn btn-sm btn-outline-danger mt-2">
+                    <i class="fa fa-trash me-1"></i>Remove
+                  </button>
+                </div>
+              </div>
+
+              <!-- Profanity / Inappropriate text alert -->
+              <div id="formAlertBox" class="alert alert-danger d-none mb-3" style="border-radius:8px;font-size:0.9rem;">
+                <i class="fa fa-triangle-exclamation me-2"></i><span id="formAlertMsg"></span>
+              </div>
+
+              <button type="submit" id="submitBtn" class="btn w-100 fw-700 py-3"
+                      style="background:var(--primary);color:#fff;border-radius:10px;font-size:1.05rem;">
+                <i class="fa fa-paper-plane me-2"></i>Submit Report
+              </button>
+
+            </form>
+          </div>
+        </div>
+      </div><!-- /col -->
+
+      <!-- ===== RIGHT: Mini Map ===== -->
+      <div class="col-lg-5">
+        <div class="report-map-container mb-3">
+          <div class="map-instructions">
+            <i class="fa fa-hand-pointer me-1"></i>
+            Click on the map to pin the hazard location. Drag the marker to adjust.
+          </div>
+          <div id="reportMap"></div>
+        </div>
+
+        <div class="card border-0 shadow-sm" style="border-radius:var(--radius);">
+          <div class="card-body p-3">
+            <h6 class="fw-700 mb-2 text-muted" style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.5px;">
+              <i class="fa fa-location-dot me-1 text-danger"></i>Selected Location
+            </h6>
+            <div id="geocodeResult" class="text-muted" style="font-size:0.88rem;">
+              No location selected yet. Click on the map.
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 mt-3" style="background:linear-gradient(135deg,var(--dark),var(--secondary));border-radius:var(--radius);">
+          <div class="card-body p-3 text-white">
+            <h6 class="fw-700 mb-2"><i class="fa fa-circle-info me-2"></i>Tips for a Good Report</h6>
+            <ul class="mb-0 ps-3" style="font-size:0.85rem;opacity:.9;line-height:1.8;">
+              <li>Take a clear photo of the hazard.</li>
+              <li>Be as specific as possible with the location.</li>
+              <li>Describe the severity and any risks caused.</li>
+              <li>Save your Report ID to track progress.</li>
+            </ul>
+          </div>
+        </div>
+      </div><!-- /col -->
+
+    </div><!-- /row -->
+  </div>
+</section>
+
+<!-- ===== DUPLICATE WARNING MODAL ===== -->
+<div class="modal fade" id="duplicateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:var(--radius);">
+      <div class="modal-header" style="background:var(--dark);color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+        <h5 class="modal-title"><i class="fa fa-copy me-2"></i>Similar Reports Found</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted mb-3">
+          The following reports appear to be similar to yours. Would you like to submit anyway or view an existing report?
+        </p>
+        <div id="duplicateList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="submitAnywayBtn" class="btn fw-600"
+                style="background:var(--primary);color:#fff;">
+          <i class="fa fa-paper-plane me-1"></i>Submit Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SUCCESS MODAL ===== -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius);">
+      <div class="modal-header border-0 pb-0">
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <div style="font-size:4rem;">✅</div>
+        <h4 class="fw-800 mt-2 mb-1" style="color:var(--success);">Report Submitted!</h4>
+        <p class="text-muted mb-3">Your hazard report has been received and is pending review.</p>
+
+        <div class="p-3 mb-3" style="background:#f4f6f9;border-radius:10px;">
+          <div class="text-muted" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px;">Your Report ID</div>
+          <div id="successReportId" class="fw-800 mt-1"
+               style="font-size:1.8rem;color:var(--dark);letter-spacing:2px;">SR-2026-001</div>
+          <button id="copyIdBtn" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="fa fa-copy me-1"></i>Copy ID
+          </button>
+        </div>
+
+        <div class="row g-2 text-start mb-3">
+          <div class="col-6">
+            <div class="text-muted" style="font-size:0.78rem;">Category</div>
+            <div id="successCategory" class="fw-600" style="font-size:0.9rem;">—</div>
+          </div>
+          <div class="col-6">
+            <div class="text-muted" style="font-size:0.78rem;">Location</div>
+            <div id="successLocation" class="fw-600" style="font-size:0.9rem;">—</div>
+          </div>
+          <div class="col-12 mt-2">
+            <div class="p-2 rounded" style="background:#e8f4fd;border-left:3px solid #1d3557;font-size:0.83rem;">
+              <div class="fw-700 text-dark"><i class="fa fa-building-columns me-1 text-primary"></i>Assigned Authority: <span id="successZone">—</span></div>
+              <div class="text-muted mt-1"><i class="fa fa-user-shield me-1"></i>Officer: <span id="successOfficer">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <a id="trackLink" href="{{ url_for('my_reports') }}" class="btn fw-600 w-100"
+           style="background:var(--secondary);color:#fff;border-radius:8px;">
+          <i class="fa fa-magnifying-glass me-2"></i>Track this Report
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   SafeRoad — Report Page JS
+   ============================================================ */
+
+/* ---- Leaflet mini-map (Hyderabad default) ---- */
+const reportMap = L.map('reportMap').setView([17.3850, 78.4867], 12);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OSM</a>',
+  maxZoom: 19
+}).addTo(reportMap);
+
+let marker = null;
+const latField = document.getElementById('latField');
+const lngField = document.getElementById('lngField');
+const geocodeResult = document.getElementById('geocodeResult');
+
+const redIcon = L.divIcon({
+  className: '',
+  html: `<div style="width:20px;height:20px;background:#e63946;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+function placeMarker(latlng) {
+  if (marker) {
+    marker.setLatLng(latlng);
+  } else {
+    marker = L.marker(latlng, { icon: redIcon, draggable: true }).addTo(reportMap);
+    marker.on('dragend', e => {
+      updateLocation(e.target.getLatLng());
+    });
+  }
+  updateLocation(latlng);
+}
+
+function updateLocation(latlng) {
+  latField.value = latlng.lat.toFixed(6);
+  lngField.value = latlng.lng.toFixed(6);
+  reverseGeocode(latlng.lat, latlng.lng);
+  fetchZone(latlng.lat, latlng.lng, document.getElementById('locationName').value);
+}
+
+function fetchZone(lat, lng, loc) {
+  const url = `/api/detect-zone?lat=${lat || ''}&lng=${lng || ''}&location=${encodeURIComponent(loc || '')}`;
+  fetch(url)
+    .then(r => r.json())
+    .then(z => {
+      if (z && z.name) {
+        document.getElementById('zoneNameText').textContent = z.name;
+        document.getElementById('zoneOfficerText').innerHTML =
+          `<i class="fa fa-user-shield me-1 text-primary"></i>Jurisdiction: <strong>${z.officer_name}</strong> &bull; ${z.office_address}`;
+      }
+    })
+    .catch(() => {});
+}
+
+// Update zone when user types location name
+const locInputElem = document.getElementById('locationName');
+let zoneDebounceTimer = null;
+locInputElem.addEventListener('input', () => {
+  clearTimeout(zoneDebounceTimer);
+  zoneDebounceTimer = setTimeout(() => {
+    fetchZone(latField.value, lngField.value, locInputElem.value);
+  }, 400);
+});
+
+function reverseGeocode(lat, lng) {
+  geocodeResult.textContent = '🔍 Looking up address…';
+  fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.display_name) {
+        geocodeResult.innerHTML = `<i class='fa fa-location-dot text-danger me-1'></i>${data.display_name}`;
+        const locInput = document.getElementById('locationName');
+        if (!locInput.value) {
+          locInput.value = data.address.road || data.address.suburb || data.display_name.split(',')[0];
+        }
+      } else {
+        geocodeResult.textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+      }
+    })
+    .catch(() => {
+      geocodeResult.textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    });
+}
+
+reportMap.on('click', e => placeMarker(e.latlng));
+
+/* ---- Severity slider ---- */
+const slider = document.getElementById('severitySlider');
+const badge  = document.getElementById('severityBadge');
+const severityLabels = { 1:'1 – Minor', 2:'2 – Low', 3:'3 – Moderate', 4:'4 – High', 5:'5 – Critical' };
+
+function updateSeverityBadge(val) {
+  badge.textContent = severityLabels[val];
+  badge.className = `severity-badge severity-${val} ms-2`;
+}
+
+slider.addEventListener('input', () => updateSeverityBadge(slider.value));
+updateSeverityBadge(slider.value);
+
+/* ---- Image preview ---- */
+const photoInput       = document.getElementById('photoInput');
+const imgPreviewWrapper= document.getElementById('imgPreviewWrapper');
+const imgPreview       = document.getElementById('imgPreview');
+const removePhoto      = document.getElementById('removePhoto');
+
+photoInput.addEventListener('change', () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgPreview.src = e.target.result;
+    imgPreviewWrapper.classList.remove('d-none');
+    imgPreviewWrapper.classList.add('active');
+  };
+  reader.readAsDataURL(file);
+});
+
+removePhoto.addEventListener('click', () => {
+  photoInput.value = '';
+  imgPreview.src = '';
+  imgPreviewWrapper.classList.add('d-none');
+  imgPreviewWrapper.classList.remove('active');
+});
+
+/* ---- Char counter for description ---- */
+const desc = document.getElementById('description');
+const descCount = document.getElementById('descCount');
+desc.addEventListener('input', () => descCount.textContent = desc.value.length);
+
+/* ---- Form submit via fetch ---- */
+const form         = document.getElementById('reportForm');
+const submitBtn    = document.getElementById('submitBtn');
+const dupModal     = new bootstrap.Modal(document.getElementById('duplicateModal'));
+const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+let pendingData    = null;
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!form.checkValidity()) {
+    form.classList.add('was-validated');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting…';
+
+  const fd = new FormData(form);
+  try {
+    const resp = await fetch('{{ url_for("report_hazard") }}', {
+      method: 'POST',
+      body: fd
+    });
+    const data = await resp.json();
+
+    const alertBox = document.getElementById('formAlertBox');
+    const alertMsg = document.getElementById('formAlertMsg');
+    alertBox.classList.add('d-none');
+
+    if (data.duplicate_suggestions && data.duplicate_suggestions.length > 0) {
+      renderDuplicates(data.duplicate_suggestions);
+      pendingData = fd;
+      dupModal.show();
+    } else if (data.success) {
+      showSuccess(data);
+    } else {
+      // Inappropriate language or validation error display
+      alertMsg.textContent = data.error || data.message || 'An error occurred. Please check your submission.';
+      alertBox.classList.remove('d-none');
+      alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  } catch(err) {
+    alert('Network error. Please try again.');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa fa-paper-plane me-2"></i>Submit Report';
+  }
+});
+
+function renderDuplicates(suggestions) {
+  const list = document.getElementById('duplicateList');
+  list.innerHTML = suggestions.map(s => `
+    <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded-3">
+      <div>
+        <span class="fw-700" style="color:var(--dark);">${s.report_id}</span>
+        <span class="badge bg-warning text-dark ms-2">${(s.category||'').replace(/_/g,' ')}</span>
+        <div class="text-muted small mt-1"><i class="fa fa-location-dot me-1"></i>${s.location_name || 'Unknown location'}</div>
+      </div>
+      <a href="/my-reports?report_id=${s.report_id}" target="_blank" class="btn btn-sm btn-outline-primary">View</a>
+    </div>
+  `).join('');
+}
+
+document.getElementById('submitAnywayBtn').addEventListener('click', async () => {
+  if (!pendingData) return;
+  pendingData.set('force_submit', '1');
+  dupModal.hide();
+  const resp = await fetch('{{ url_for("report_hazard") }}', { method: 'POST', body: pendingData });
+  const data = await resp.json();
+  if (data.success) showSuccess(data);
+});
+
+function showSuccess(data) {
+  document.getElementById('successReportId').textContent = data.report_id || 'SR-2026-001';
+  document.getElementById('successCategory').textContent = (data.category || '').replace(/_/g,' ');
+  document.getElementById('successLocation').textContent = data.location_name || 'Unknown';
+  if (data.zone_name) {
+    document.getElementById('successZone').textContent = data.zone_name;
+  }
+  if (data.assigned_officer) {
+    document.getElementById('successOfficer').textContent = `${data.assigned_officer} (${data.officer_title || 'Circle Officer'})`;
+  }
+  const trackLink = document.getElementById('trackLink');
+  trackLink.href = `/my-reports?report_id=${data.report_id}`;
+  form.reset();
+  form.classList.remove('was-validated');
+  if (marker) { reportMap.removeLayer(marker); marker = null; }
+  latField.value = ''; lngField.value = '';
+  geocodeResult.textContent = 'No location selected yet. Click on the map.';
+  imgPreviewWrapper.classList.add('d-none');
+  updateSeverityBadge(3);
+  document.getElementById('formAlertBox').classList.add('d-none');
+  successModal.show();
+}
+
+/* ---- Copy report ID ---- */
+document.getElementById('copyIdBtn').addEventListener('click', () => {
+  const id = document.getElementById('successReportId').textContent;
+  navigator.clipboard.writeText(id).then(() => {
+    const btn = document.getElementById('copyIdBtn');
+    btn.innerHTML = '<i class="fa fa-check me-1"></i>Copied!';
+    setTimeout(() => btn.innerHTML = '<i class="fa fa-copy me-1"></i>Copy ID', 2000);
+  });
+});
+</script>
+{% endblock %}

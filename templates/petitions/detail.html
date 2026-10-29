@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad Petition — {{ petition.title }}{% endblock %}
+
+{% block content %}
+<section class="petition-detail-page py-5" style="background:#f8fafc; min-height:85vh;">
+  <div class="container-xl">
+
+    <!-- Breadcrumb & Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('petitions_list') }}">Petitions</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('petitions_list') }}?zone={{ petition.zone_id }}">{{ petition.zone_name }}</a></li>
+          <li class="breadcrumb-item active">{{ petition.petition_id }}</li>
+        </ol>
+      </nav>
+      <div>
+        <a href="{{ url_for('petitions_list') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="fa fa-arrow-left me-1"></i>All Petitions
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- LEFT: Petition Story & Evidence -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm p-4 mb-4" style="border-radius:12px; background:#fff;">
+          
+          <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1 fw-700">
+              {{ petition.category_label }}
+            </span>
+            <span class="badge {% if petition.status == 'Victorious / Repaired' %}bg-success{% elif petition.status == 'Milestone Reached' %}bg-warning text-dark{% else %}bg-secondary{% endif %} px-3 py-1 fw-600">
+              {{ petition.status }}
+            </span>
+            {% if petition.report_id %}
+            <a href="{{ url_for('my_reports') }}?report_id={{ petition.report_id }}" class="badge bg-light text-primary border text-decoration-none">
+              <i class="fa fa-link me-1"></i>Linked Hazard #{{ petition.report_id }}
+            </a>
+            {% endif %}
+          </div>
+
+          <h2 class="fw-800 text-dark mb-3" style="line-height:1.35;">
+            {{ petition.title }}
+          </h2>
+
+          <!-- Municipal Target -->
+          <div class="p-3 rounded-3 mb-4 d-flex align-items-center" style="background:#f1f5f9; border-left:4px solid #1d3557;">
+            <div style="font-size:1.8rem; margin-right:12px;">🏛️</div>
+            <div>
+              <div class="small text-muted text-uppercase fw-700" style="font-size:0.72rem; letter-spacing:0.5px;">Target Municipal Authority</div>
+              <div class="fw-700 text-dark">{{ petition.target_authority }}</div>
+              <div class="text-muted small"><i class="fa fa-location-dot me-1 text-danger"></i>{{ petition.location_name }} &bull; {{ petition.zone_name }}</div>
+            </div>
+          </div>
+
+          <!-- Creator Info -->
+          <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+            <div class="rounded-circle d-flex align-items-center justify-content-center bg-danger text-white fw-bold"
+                 style="width:44px; height:44px; font-size:1.1rem;">
+              {{ petition.creator_name[0] | upper }}
+            </div>
+            <div>
+              <div class="fw-700 text-dark">{{ petition.creator_name }}</div>
+              <div class="text-muted small">Started this petition on {{ petition.created_at.strftime('%d %B %Y') if petition.created_at else 'Recently' }}</div>
+            </div>
+          </div>
+
+          <!-- Petition Story -->
+          <h5 class="fw-700 text-dark mb-3">Why This Road Hazard Demands Immediate Action</h5>
+          <div class="petition-story-body text-secondary mb-4" style="font-size:1rem; line-height:1.75; white-space:pre-line;">
+            {{ petition.story }}
+          </div>
+
+          {% if petition.official_response %}
+          <!-- Official Authority Response -->
+          <div class="p-4 rounded-3 mb-4" style="background:#d1e7dd; border:1px solid #a3cfbb;">
+            <h6 class="fw-800 text-success mb-2">
+              <i class="fa fa-building-circle-check me-2"></i>Official Authority Response &amp; Repair Status
+            </h6>
+            <p class="mb-0 text-success-emphasis" style="line-height:1.6;">
+              {{ petition.official_response }}
+            </p>
+          </div>
+          {% endif %}
+
+        </div>
+
+        <!-- Community Signatures Stream -->
+        <div class="card border-0 shadow-sm p-4" style="border-radius:12px; background:#fff;">
+          <h5 class="fw-700 text-dark mb-3">
+            <i class="fa fa-comments me-2 text-primary"></i>Reasons for Signing ({{ petition.signature_count }} Citizens)
+          </h5>
+          
+          <div id="signaturesList" class="d-flex flex-column gap-3">
+            {% if petition.signatures %}
+              {% for sig in petition.signatures | sort(attribute='signed_at', reverse=True) %}
+              <div class="p-3 rounded-3 border" style="background:#fcfcfd;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="fw-700 text-dark" style="font-size:0.92rem;">{{ sig.signer_name }}</div>
+                  <small class="text-muted" style="font-size:0.75rem;">{{ sig.signed_at.strftime('%d %b, %H:%M') if sig.signed_at else '' }}</small>
+                </div>
+                <div class="text-muted small mb-2"><i class="fa fa-house-chimney me-1 text-secondary"></i>{{ sig.locality or 'Concerned Resident' }}</div>
+                {% if sig.comment %}
+                <p class="text-secondary small mb-0 fst-italic" style="line-height:1.5;">
+                  "{{ sig.comment }}"
+                </p>
+                {% endif %}
+              </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted small fst-italic mb-0">No signatures yet. Be the very first to sign and make this road safer!</p>
+            {% endif %}
+          </div>
+        </div>
+
+      </div><!-- /col -->
+
+      <!-- RIGHT: Sign Form & Mobilization Card -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm p-4 sticky-top" style="top:90px; border-radius:12px; background:#fff;">
+          
+          <!-- Signature Goal & Progress -->
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+              <h3 class="fw-800 text-danger mb-0" id="liveSigCount">{{ petition.signature_count }}</h3>
+              <span class="text-muted small fw-600">Goal: {{ petition.target_signatures }} verified signatures</span>
+            </div>
+            
+            <div class="progress mb-2" style="height:10px; border-radius:5px; background:#e9ecef;">
+              <div id="liveProgressBar" class="progress-bar {% if petition.progress_percent >= 100 %}bg-success{% else %}bg-danger{% endif %}"
+                   style="width: {{ petition.progress_percent }}%; transition:width 0.4s ease;"></div>
+            </div>
+
+            <div class="d-flex justify-content-between small text-muted">
+              <span id="liveProgressPercent"><strong>{{ petition.progress_percent }}%</strong> of goal</span>
+              <span><i class="fa fa-shield-check text-success me-1"></i>Verified GHMC Escalation</span>
+            </div>
+          </div>
+
+          <h5 class="fw-800 text-dark mb-1">Sign this Petition</h5>
+          <p class="text-muted small mb-3">Add your voice. Signatures are forwarded directly to circle municipal engineers.</p>
+
+          <!-- Alert message box -->
+          <div id="signAlert" class="alert d-none small mb-3" style="border-radius:8px;"></div>
+
+          <!-- Digital Signature Form -->
+          <form id="signForm" method="POST" action="{{ url_for('sign_petition', petition_id=petition.petition_id) }}">
+            <div class="mb-3">
+              <label class="form-label small fw-700 text-muted">Full Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" id="signerName" class="form-control form-control-sm" placeholder="Your full name" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-700 text-muted">Email Address <span class="text-danger">*</span></label>
+              <input type="email" name="email" id="signerEmail" class="form-control form-control-sm" placeholder="e.g. name@example.com" required>
+              <div class="form-text" style="font-size:0.72rem;">You will receive an automated confirmation email.</div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-7">
+                <label class="form-label small fw-700 text-muted">Locality / Role</label>
+                <input type="text" name="locality" id="signerLocality" class="form-control form-control-sm" placeholder="e.g. Madhapur resident, Daily commuter">
+              </div>
+              <div class="col-5">
+                <label class="form-label small fw-700 text-muted">Phone (optional)</label>
+                <input type="tel" name="phone" id="signerPhone" class="form-control form-control-sm" placeholder="+91...">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-700 text-muted">Reason for signing (optional)</label>
+              <textarea name="comment" id="signerComment" class="form-control form-control-sm" rows="3"
+                        placeholder="Why is fixing this road important to you? (Filtered for respectful civic language)"></textarea>
+            </div>
+
+            <button type="submit" id="signSubmitBtn" class="btn btn-danger w-100 fw-700 py-3 shadow-sm"
+                    style="border-radius:8px; font-size:1.05rem;">
+              <i class="fa fa-pen-nib me-2"></i>Sign This Petition
+            </button>
+          </form>
+
+          <!-- Share Section -->
+          <div class="mt-4 pt-3 border-top text-center">
+            <span class="small fw-700 text-muted text-uppercase d-block mb-2" style="letter-spacing:0.5px;">Mobilize Fellow Citizens</span>
+            <div class="d-flex justify-content-center gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyPetitionLink()">
+                <i class="fa fa-link me-1"></i>Copy Link
+              </button>
+              <a href="https://api.whatsapp.com/send?text={{ ('Sign this road safety petition on SafeRoad: ' ~ petition.title ~ ' ' ~ request.url) | urlencode }}"
+                 target="_blank" class="btn btn-sm btn-outline-success">
+                <i class="fa-brands fa-whatsapp me-1"></i>WhatsApp
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /col -->
+
+    </div><!-- /row -->
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const signForm = document.getElementById('signForm');
+const signSubmitBtn = document.getElementById('signSubmitBtn');
+const signAlert = document.getElementById('signAlert');
+
+signForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  signSubmitBtn.disabled = true;
+  signSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Recording Signature...';
+  signAlert.classList.add('d-none');
+
+  const formData = new FormData(signForm);
+
+  try {
+    const resp = await fetch('{{ url_for("sign_petition", petition_id=petition.petition_id) }}', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      signAlert.className = 'alert alert-success small mb-3';
+      signAlert.innerHTML = '<i class="fa fa-circle-check me-2"></i><strong>Thank you!</strong> Your digital signature has been recorded and an email confirmation was sent to you.';
+      signAlert.classList.remove('d-none');
+
+      // Update counters dynamically
+      document.getElementById('liveSigCount').textContent = data.signature_count;
+      document.getElementById('liveProgressBar').style.width = data.progress_percent + '%';
+      document.getElementById('liveProgressPercent').innerHTML = `<strong>${data.progress_percent}%</strong> of goal`;
+
+      // Prepend to signatures stream
+      const sigList = document.getElementById('signaturesList');
+      const newSigDiv = document.createElement('div');
+      newSigDiv.className = 'p-3 rounded-3 border bg-light';
+      newSigDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <div class="fw-700 text-dark">${document.getElementById('signerName').value}</div>
+          <small class="badge bg-success">Just now</small>
+        </div>
+        <div class="text-muted small mb-2"><i class="fa fa-house-chimney me-1"></i>${document.getElementById('signerLocality').value || 'Concerned Resident'}</div>
+        ${document.getElementById('signerComment').value ? `<p class="text-secondary small mb-0 fst-italic">"${document.getElementById('signerComment').value}"</p>` : ''}
+      `;
+      sigList.prepend(newSigDiv);
+
+      signForm.reset();
+    } else {
+      signAlert.className = 'alert alert-danger small mb-3';
+      signAlert.innerHTML = `<i class="fa fa-triangle-exclamation me-2"></i>${data.error || 'Could not record signature. Please try again.'}`;
+      signAlert.classList.remove('d-none');
+    }
+  } catch (err) {
+    signAlert.className = 'alert alert-danger small mb-3';
+    signAlert.textContent = 'Network error. Please check your connection.';
+    signAlert.classList.remove('d-none');
+  } finally {
+    signSubmitBtn.disabled = false;
+    signSubmitBtn.innerHTML = '<i class="fa fa-pen-nib me-2"></i>Sign This Petition';
+  }
+});
+
+function copyPetitionLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    alert('Petition link copied to clipboard!');
+  });
+}
+</script>
+{% endblock %}
