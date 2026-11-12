@@ -262,6 +262,11 @@
           </div>
         </div>
 
+        <div id="successPhotoWrapper" class="mb-3 d-none">
+          <div class="text-muted mb-1" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:.5px;">Uploaded Photo</div>
+          <img id="successPhoto" src="" alt="Uploaded hazard photo" class="img-fluid rounded border shadow-sm" style="max-height:160px;object-fit:cover;">
+        </div>
+
         <a id="trackLink" href="{{ url_for('my_reports') }}" class="btn fw-600 w-100"
            style="background:var(--secondary);color:#fff;border-radius:8px;">
           <i class="fa fa-magnifying-glass me-2"></i>Track this Report
@@ -491,6 +496,16 @@ function showSuccess(data) {
   }
   if (data.assigned_officer) {
     document.getElementById('successOfficer').textContent = `${data.assigned_officer} (${data.officer_title || 'Circle Officer'})`;
+  }
+  const sPhotoWrap = document.getElementById('successPhotoWrapper');
+  const sPhoto = document.getElementById('successPhoto');
+  if (sPhotoWrap && sPhoto) {
+    if (data.image_path) {
+      sPhoto.src = data.image_path.startsWith('/') ? data.image_path : `/static/${data.image_path}`;
+      sPhotoWrap.classList.remove('d-none');
+    } else {
+      sPhotoWrap.classList.add('d-none');
+    }
   }
   const trackLink = document.getElementById('trackLink');
   trackLink.href = `/my-reports?report_id=${data.report_id}`;

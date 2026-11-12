@@ -220,6 +220,12 @@ function buildPopup(r) {
     }
   }
 
+  let imgHtml = '';
+  if (r.image_path) {
+    const imgSrc = r.image_path.startsWith('/') ? r.image_path : `/static/${r.image_path}`;
+    imgHtml = `<div class="my-2"><img src="${imgSrc}" alt="Hazard Photo" class="img-fluid rounded border" style="max-height:110px;width:100%;object-fit:cover;"></div>`;
+  }
+
   return `
     <div class="popup-title">${r.report_id || 'N/A'}</div>
     <div class="mb-1">
@@ -229,6 +235,7 @@ function buildPopup(r) {
     </div>
     <div class="text-muted" style="font-size:.8rem;"><i class="fa fa-location-dot me-1 text-danger"></i>${r.location_name || 'Unknown'}</div>
     <div class="my-1">${stars} <small class="text-muted">${r.severity}/5</small> · <small class="text-primary fw-600"><i class="fa fa-users me-1"></i>${confirms} confirmed</small></div>
+    ${imgHtml}
     ${desc ? `<p style="font-size:.8rem;color:#555;margin:.4rem 0;">${desc}</p>` : ''}
     ${reviewHtml}
     <a href="/my-reports?report_id=${r.report_id}" class="btn btn-sm fw-600 mt-2 w-100"

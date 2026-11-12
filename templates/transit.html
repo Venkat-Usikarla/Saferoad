@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}SafeRoad — Public Transport Route Finder (Hyderabad){% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #transitMap {
+    height: 540px;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e2e8f0;
+  }
+  .transit-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #fff;
+  }
+  .transit-card:hover, .transit-card.active {
+    border-color: #1d4ed8;
+    box-shadow: 0 6px 20px rgba(29, 78, 216, 0.12);
+  }
+  .step-pill {
+    position: relative;
+    padding-left: 1.4rem;
+    margin-bottom: 0.55rem;
+    font-size: 0.85rem;
+  }
+  .step-pill::before {
+    content: "";
+    position: absolute;
+    left: 0.25rem;
+    top: 0.4rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1d4ed8;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4" style="background:#f8fafc; min-height: 85vh;">
+  <div class="container-xl">
+
+    <!-- Header Banner -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div>
+        <h2 class="fw-800 mb-1" style="color:var(--dark);">Public Transport Route Finder (A → B)</h2>
+        <p class="text-muted mb-0">
+          Compare Hyderabad Metro, TSRTC City Buses, and MMTS Rail with fares, transfers, and station-area hazard alerts.
+        </p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('route_safety_page') }}" class="btn btn-outline-dark fw-600 btn-sm">
+          <i class="fa fa-route me-1"></i>Switch to Route Check
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Left Panel: Controls & Transit Options -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+          <div class="card-body p-4">
+            <h6 class="fw-700 text-dark mb-3"><i class="fa fa-map-pin text-danger me-2"></i>Origin & Destination</h6>
+
+            <!-- Quick Presets -->
+            <div class="mb-3">
+              <label class="form-label small fw-700 text-muted text-uppercase">Popular Commutes</label>
+              <select id="presetCorridor" class="form-select form-select-sm fw-600">
+                <option value="">-- Select a Hyderabad Route or Drag Pins --</option>
+                <option value="17.4401,78.3489|17.4368,78.5008">Gachibowli → Secunderabad Station</option>
+                <option value="17.4488,78.3831|17.3616,78.4747">Hitec City → Charminar</option>
+                <option value="17.4966,78.3731|17.3497,78.5478">Miyapur → LB Nagar</option>
+                <option value="17.4126,78.4398|17.4005,78.5601">Banjara Hills → Uppal</option>
+                <option value="17.4840,78.3168|17.3902,78.4675">Lingampalli → Nampally</option>
+              </select>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <div class="p-2 rounded bg-light border">
+                  <div class="small fw-700 text-success"><i class="fa fa-circle-dot me-1"></i>Origin (A)</div>
+                  <div id="originCoordsText" class="text-muted font-monospace" style="font-size:0.75rem;">17.4488, 78.3831</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="p-2 rounded bg-light border">
+                  <div class="small fw-700 text-danger"><i class="fa fa-flag-checkered me-1"></i>Destination (B)</div>
+                  <div id="destCoordsText" class="text-muted font-monospace" style="font-size:0.75rem;">17.4368, 78.5008</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button id="findTransitBtn" class="btn btn-primary fw-700 flex-grow-1">
+                <i class="fa fa-magnifying-glass me-2"></i>Find Best Public Transport
+              </button>
+              <button id="swapBtn" class="btn btn-outline-secondary" title="Swap Origin and Destination">
+                <i class="fa fa-right-left"></i>
+              </button>
+            </div>
+            <small class="text-muted d-block mt-2" style="font-size:0.75rem;">
+              <i class="fa fa-hand-pointer me-1"></i>Tip: Drag the green <strong>A</strong> or red <strong>B</strong> pins on the map to any spot in Hyderabad.
+            </small>
+          </div>
+        </div>
+
+        <!-- Results List -->
+        <div id="transitResults">
+          <div class="text-center text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-2"></span>Finding best transit connections…
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Interactive Map -->
+      <div class="col-lg-7">
+        <div id="transitMap"></div>
+        <div class="card border-0 shadow-sm mt-3" style="border-radius:12px;">
+          <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-2 small">
+            <div>
+              <span class="badge me-1" style="background:#e63946;">Red Line</span>
+              <span class="badge me-1" style="background:#1d4ed8;">Blue Line</span>
+              <span class="badge me-1" style="background:#15803d;">Green Line / TSRTC Bus</span>
+              <span class="badge" style="background:#7c3aed;">MMTS Rail</span>
+            </div>
+            <div class="text-muted">
+              <i class="fa fa-triangle-exclamation text-warning me-1"></i>Includes 500m station-area hazard checks
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('transitMap').setView([17.4250, 78.4450], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap',
+  maxZoom: 19
+}).addTo(map);
+
+let startLat = 17.4488, startLng = 78.3831; // Hitec City
+let endLat = 17.4368, endLng = 78.5008;     // Secunderabad
+
+const pinA = L.divIcon({
+  className: '',
+  html: `<div style="width:28px;height:28px;background:#15803d;color:#fff;font-weight:800;font-size:13px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;">A</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
+const pinB = L.divIcon({
+  className: '',
+  html: `<div style="width:28px;height:28px;background:#e63946;color:#fff;font-weight:800;font-size:13px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;">B</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
+const markerA = L.marker([startLat, startLng], { icon: pinA, draggable: true }).addTo(map).bindTooltip('Origin (A)');
+const markerB = L.marker([endLat, endLng], { icon: pinB, draggable: true }).addTo(map).bindTooltip('Destination (B)');
+
+let routeLayers = L.layerGroup().addTo(map);
+let currentOptions = [];
+
+function updateCoordsDisplay() {
+  document.getElementById('originCoordsText').textContent = `${startLat.toFixed(4)}, ${startLng.toFixed(4)}`;
+  document.getElementById('destCoordsText').textContent = `${endLat.toFixed(4)}, ${endLng.toFixed(4)}`;
+}
+
+markerA.on('dragend', e => {
+  const ll = e.target.getLatLng();
+  startLat = ll.lat; startLng = ll.lng;
+  updateCoordsDisplay();
+  fetchTransitRoutes();
+});
+
+markerB.on('dragend', e => {
+  const ll = e.target.getLatLng();
+  endLat = ll.lat; endLng = ll.lng;
+  updateCoordsDisplay();
+  fetchTransitRoutes();
+});
+
+document.getElementById('presetCorridor').addEventListener('change', function() {
+  if (!this.value) return;
+  const [a, b] = this.value.split('|');
+  const [aLat, aLng] = a.split(',').map(Number);
+  const [bLat, bLng] = b.split(',').map(Number);
+  startLat = aLat; startLng = aLng;
+  endLat = bLat; endLng = bLng;
+  markerA.setLatLng([startLat, startLng]);
+  markerB.setLatLng([endLat, endLng]);
+  updateCoordsDisplay();
+  fetchTransitRoutes();
+});
+
+document.getElementById('swapBtn').addEventListener('click', () => {
+  [startLat, endLat] = [endLat, startLat];
+  [startLng, endLng] = [endLng, startLng];
+  markerA.setLatLng([startLat, startLng]);
+  markerB.setLatLng([endLat, endLng]);
+  updateCoordsDisplay();
+  fetchTransitRoutes();
+});
+
+document.getElementById('findTransitBtn').addEventListener('click', fetchTransitRoutes);
+
+async function fetchTransitRoutes() {
+  const resultsEl = document.getElementById('transitResults');
+  resultsEl.innerHTML = `<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Calculating Metro, Bus & MMTS options…</div>`;
+
+  try {
+    const resp = await fetch('/api/public-transport', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_lat: startLat,
+        start_lng: startLng,
+        end_lat: endLat,
+        end_lng: endLng
+      })
+    });
+    const data = await resp.json();
+    currentOptions = data.options || [];
+    renderTransitOptions(currentOptions, data.direct_distance_km);
+    if (currentOptions.length > 0) {
+      drawOptionOnMap(0);
+    }
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="alert alert-danger">Failed to load public transport routes. Please try again.</div>`;
+  }
+}
+
+function renderTransitOptions(options, distKm) {
+  const resultsEl = document.getElementById('transitResults');
+  if (!options.length) {
+    resultsEl.innerHTML = `<div class="alert alert-warning">No transit options found for this pair.</div>`;
+    return;
+  }
+
+  resultsEl.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="small fw-700 text-muted text-uppercase">Best Ways to Travel (${distKm} km aerial)</span>
+      <span class="badge bg-light text-dark border">${options.length} Options</span>
+    </div>
+  ` + options.map((opt, idx) => {
+    const hazardBadge = opt.station_hazards && opt.station_hazards.length > 0
+      ? `<div class="alert alert-warning py-2 px-3 mt-2 mb-0" style="font-size:0.78rem;">
+           <i class="fa fa-triangle-exclamation me-1 text-danger"></i>
+           <strong>${opt.station_hazards.length} Road Hazard(s)</strong> reported near boarding/alighting stops:
+           ${opt.station_hazards.slice(0,2).map(h => `${h.category_label} (${h.distance_m}m away)`).join(', ')}
+         </div>`
+      : `<div class="text-success small mt-2" style="font-size:0.76rem;">
+           <i class="fa fa-circle-check me-1"></i>Station access roads currently clear of reported hazards
+         </div>`;
+
+    return `
+      <div class="transit-card p-3 mb-3 ${idx === 0 ? 'active' : ''}" onclick="selectOption(${idx}, this)">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <span class="badge text-white mb-1" style="background:${opt.badge_color};font-size:0.7rem;">${opt.badge}</span>
+            <h6 class="fw-800 text-dark mb-0">
+              <i class="fa ${opt.icon} me-2" style="color:${opt.badge_color};"></i>${opt.mode}
+            </h6>
+          </div>
+          <div class="text-end">
+            <div class="fw-800 text-dark" style="font-size:1.1rem;">${opt.duration_min} min</div>
+            <div class="fw-700 text-success" style="font-size:0.85rem;">₹${opt.fare_inr}</div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 text-muted mb-2" style="font-size:0.76rem;">
+          <span><i class="fa fa-clock me-1"></i>${opt.frequency}</span>
+          <span>&bull;</span>
+          <span><i class="fa fa-right-left me-1"></i>${opt.transfers === 0 ? 'Direct (No transfer)' : opt.transfers + ' transfer'}</span>
+          <span>&bull;</span>
+          <span>${opt.stops_count} stops</span>
+        </div>
+
+        <div class="mt-2 pt-2 border-top">
+          ${opt.steps.map(s => `<div class="step-pill text-secondary">${s}</div>`).join('')}
+        </div>
+        ${hazardBadge}
+      </div>
+    `;
+  }).join('');
+}
+
+window.selectOption = function(idx, el) {
+  document.querySelectorAll('.transit-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  drawOptionOnMap(idx);
+};
+
+function drawOptionOnMap(idx) {
+  routeLayers.clearLayers();
+  const opt = currentOptions[idx];
+  if (!opt) return;
+
+  // Draw dashed access legs (Origin -> Boarding, Alighting -> Dest)
+  if (opt.polyline && opt.polyline.length >= 2) {
+    const first = opt.polyline[0];
+    const second = opt.polyline[1];
+    const last = opt.polyline[opt.polyline.length - 1];
+    const prevLast = opt.polyline[opt.polyline.length - 2];
+
+    L.polyline([first, second], { color: '#64748b', weight: 4, dashArray: '6, 8' }).addTo(routeLayers);
+    L.polyline([prevLast, last], { color: '#64748b', weight: 4, dashArray: '6, 8' }).addTo(routeLayers);
+  }
+
+  // Draw transit segments with line colors
+  (opt.segments || []).forEach(seg => {
+    L.polyline(seg.coords, { color: seg.color || '#1d4ed8', weight: 6, opacity: 0.9 }).addTo(routeLayers);
+
+    // Boarding / Alighting markers
+    if (seg.coords.length > 0) {
+      L.circleMarker(seg.coords[0], {
+        radius: 6, color: '#fff', weight: 2, fillColor: seg.color, fillOpacity: 1
+      }).bindTooltip(seg.from_station).addTo(routeLayers);
+
+      L.circleMarker(seg.coords[seg.coords.length - 1], {
+        radius: 6, color: '#fff', weight: 2, fillColor: seg.color, fillOpacity: 1
+      }).bindTooltip(seg.to_station).addTo(routeLayers);
+    }
+  });
+
+  if (opt.polyline && opt.polyline.length > 0) {
+    map.fitBounds(L.latLngBounds(opt.polyline), { padding: [40, 40] });
+  }
+}
+
+updateCoordsDisplay();
+fetchTransitRoutes();
+</script>
+{% endblock %}

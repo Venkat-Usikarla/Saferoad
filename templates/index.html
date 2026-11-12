@@ -20,19 +20,22 @@
           <a href="{{ url_for('report_hazard') }}" class="btn btn-hero-primary">
             <i class="fa fa-triangle-exclamation me-2"></i>Report a Hazard
           </a>
-          <a href="{{ url_for('route_safety_page') }}" class="btn btn-info fw-bold text-dark px-3 py-2">
-            <i class="fa fa-route me-2"></i>SafeRoute
+          <a href="{{ url_for('route_safety_page') }}" class="btn btn-hero-outline">
+            <i class="fa fa-route me-2"></i>Route Check
           </a>
-          <a href="{{ url_for('petitions_list') }}" class="btn btn-warning fw-bold text-dark px-3 py-2">
-            <i class="fa fa-bullhorn me-2"></i>Community Petitions
+          <a href="{{ url_for('public_transport_page') }}" class="btn btn-hero-outline">
+            <i class="fa fa-train-subway me-2"></i>Public Transport
+          </a>
+          <a href="{{ url_for('petitions_list') }}" class="btn btn-hero-outline">
+            <i class="fa fa-bullhorn me-2"></i>Petitions
           </a>
           <a href="{{ url_for('view_map') }}" class="btn btn-hero-outline">
-            <i class="fa fa-map me-2"></i>View Hazard Map
+            <i class="fa fa-map me-2"></i>Hazard Map
           </a>
         </div>
       </div>
       <div class="col-lg-5 d-none d-lg-flex justify-content-center fade-in fade-in-delay-2">
-        <div style="font-size:10rem;opacity:0.18;user-select:none;">🛣️</div>
+        <i class="fa fa-road" style="font-size:9rem;opacity:0.12;color:#ffffff;"></i>
       </div>
     </div>
 
@@ -135,6 +138,10 @@
             </span>
             <small class="opacity-75">{{ r.submitted_at.strftime('%d %b %Y') if r.submitted_at else 'N/A' }}</small>
           </div>
+          {% if r.image_path %}
+          <img src="{{ url_for('static', filename=r.image_path) }}" alt="Hazard Photo"
+               style="height:150px;width:100%;object-fit:cover;border-bottom:1px solid #eee;">
+          {% endif %}
           <div class="card-body">
             <h6 class="fw-700 mb-1" style="color:var(--dark);">{{ r.location_name or 'Unknown Location' }}</h6>
             <div class="severity-stars mb-2">

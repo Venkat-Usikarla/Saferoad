@@ -65,6 +65,7 @@ from profanity_filter import contains_profanity, sanitize_or_validate
 from zones import detect_zone, HYDERABAD_ZONES, get_all_zones, get_zone_by_id
 from admin_auth import authenticate_admin, get_all_credentials_for_super_admin, ADMIN_ACCOUNTS
 from route_safety import SAMPLE_HYDERABAD_ROUTES, evaluate_route_safety
+from transit_routing import find_public_transport_routes
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -427,6 +428,7 @@ def _register_public_routes(app: Flask) -> None:
             assigned_officer=zone['officer_name'],
             officer_title=zone['officer_title'],
             office_address=zone['office_address'],
+            image_path=image_path,
             duplicate_suggestions=duplicate_suggestions,
         ), 201
 
@@ -444,8 +446,9 @@ def _register_public_routes(app: Flask) -> None:
     @app.route('/track')
     @app.route('/track-report')
     def my_reports():
-        """Search page for a reporter to look up their submissions."""
-        return render_template('my_reports.html')
+        """Search & browse page for citizens to look up road hazard complaints."""
+        recent_reports = Report.query.order_by(Report.created_at.desc()).limit(12).all()
+        return render_template('my_reports.html', recent_reports=recent_reports)
 
     # ------------------------------------------------------------------
     # DT Feature 1: SafeRoute — Route Safety Map & Corridor Hazard Assessment
@@ -463,6 +466,18 @@ def _register_public_routes(app: Flask) -> None:
             'routes.html',
             sample_routes=SAMPLE_HYDERABAD_ROUTES,
             hazard_categories=HAZARD_CATEGORIES,
+        )
+
+    @app.route('/public-transport')
+    @app.route('/transit')
+    def public_transport_page():
+        """
+        Public Transport Route Finder (Hyderabad Metro, TSRTC Bus, MMTS)
+        with SafeRoad station-area hazard warnings.
+        """
+        return render_template(
+            'transit.html',
+            sample_routes=SAMPLE_HYDERABAD_ROUTES,
         )
 
     # ------------------------------------------------------------------
@@ -922,6 +937,30 @@ def _register_api_routes(app: Flask) -> None:
         hazards = [r.to_dict() for r in reports]
         assessment = evaluate_route_safety(polyline, hazards, corridor_buffer_m=buffer_m)
         return jsonify(assessment)
+
+    @app.route('/api/public-transport', methods=['POST'])
+    def api_public_transport():
+        """
+        Compute the best public transport options (Metro, TSRTC Bus, MMTS)
+        between Origin (start_lat, start_lng) and Destination (end_lat, end_lng).
+        """
+        data = request.get_json(force=True) or {}
+        try:
+            start_lat = float(data['start_lat'])
+            start_lng = float(data['start_lng'])
+            end_lat = float(data['end_lat'])
+            end_lng = float(data['end_lng'])
+        except (KeyError, TypeError, ValueError):
+            return jsonify(error='Valid start_lat, start_lng, end_lat, end_lng are required.'), 400
+
+        reports = Report.query.filter(
+            Report.lat.isnot(None),
+            Report.lng.isnot(None),
+            Report.status.in_(['Pending Review', 'Under Review', 'Action in Progress'])
+        ).all()
+        hazards = [r.to_dict() for r in reports]
+        result = find_public_transport_routes(start_lat, start_lng, end_lat, end_lng, hazards=hazards)
+        return jsonify(result)
 
 
 # ---------------------------------------------------------------------------

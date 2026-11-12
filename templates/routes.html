@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}SafeRoad — SafeRoute Planner{% endblock %}
+{% block title %}SafeRoad — Route Check{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -67,18 +67,15 @@
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
       <div>
-        <div class="badge bg-danger-subtle text-danger border border-danger-subtle mb-1 fw-700">
-          <i class="fa fa-shield-halved me-1"></i>DT FEATURE: ROAD SAFETY ROUTE MAP
-        </div>
-        <h2 class="section-title mb-0">SafeRoute — Commute Road Safety Planner</h2>
-        <p class="text-muted mb-0">Detect active potholes, waterlogging &amp; infrastructure hazards along your travel corridor</p>
+        <h2 class="section-title mb-1">Route Check</h2>
+        <p class="text-muted mb-0">Check active potholes, waterlogging, and road hazards along your travel route.</p>
       </div>
       <div class="d-flex gap-2">
-        <a href="{{ url_for('view_map') }}" class="btn btn-outline-secondary fw-600 btn-sm">
-          <i class="fa fa-map me-1"></i>City Hazard Map
+        <a href="{{ url_for('public_transport_page') }}" class="btn btn-outline-success fw-600 btn-sm">
+          <i class="fa fa-train-subway me-1"></i>Public Transport
         </a>
-        <a href="{{ url_for('petitions_list') }}" class="btn btn-outline-primary fw-600 btn-sm">
-          <i class="fa fa-bullhorn me-1"></i>Community Petitions
+        <a href="{{ url_for('view_map') }}" class="btn btn-outline-secondary fw-600 btn-sm">
+          <i class="fa fa-map me-1"></i>Hazard Map
         </a>
       </div>
     </div>
