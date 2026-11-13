@@ -33,6 +33,18 @@ body {
 .fw-800 { font-weight: 800; }
 .fw-600 { font-weight: 600; }
 
+/* ---- Buttons & Controls Vertical Alignment Fix ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.btn i {
+  line-height: 1;
+}
+
 /* =============================================
    NAVBAR
    ============================================= */
@@ -794,15 +806,16 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
+  height: 52px;
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 1040;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding: 2px 0 2px;
+  padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
 }
 
 .mobile-nav-item {
@@ -812,16 +825,24 @@ body {
   justify-content: center;
   color: #64748b;
   text-decoration: none;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 2px 4px;
   flex: 1;
   transition: color 0.2s ease;
+  line-height: 1.1;
 }
 
 .mobile-nav-item i {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   margin-bottom: 2px;
+  line-height: 1;
+}
+
+.mobile-nav-item span {
+  display: block;
+  line-height: 1;
+  margin-top: 1px;
 }
 
 .mobile-nav-item:hover,
@@ -830,17 +851,17 @@ body {
 }
 
 .mobile-nav-action .action-circle {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, #e63946 0%, #f4a261 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: -18px;
+  margin-top: -16px;
   box-shadow: 0 4px 12px rgba(230, 57, 70, 0.35);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   border: 3px solid #ffffff;
   transition: transform 0.2s ease;
 }
@@ -850,7 +871,7 @@ body {
 }
 
 .mobile-nav-action span {
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 /* PWA Install Banner */
@@ -888,7 +909,7 @@ body {
    ============================================= */
 @media (max-width: 768px) {
   body {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
   .saferoad-navbar .navbar-brand {
     font-size: 1.2rem;
@@ -943,12 +964,40 @@ body {
     display: none;
   }
 
-  /* Responsive Heights for Route and Transit Leaflet Maps */
-  #routeMap,
-  #transitMap,
-  .route-map-card {
-    height: 340px !important;
+  /* Option A: Sticky Top Map on Mobile for Route Check & Public Transport */
+  .sticky-mobile-map-col {
+    order: -1;
+    position: -webkit-sticky;
+    position: sticky;
+    top: 54px;
+    z-index: 990;
+    background: #f8fafc;
+    padding-top: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
   }
+
+  .sticky-mobile-map-col #routeMap,
+  .sticky-mobile-map-col #transitMap {
+    height: 38vh !important;
+    min-height: 230px;
+    max-height: 300px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    width: 100%;
+  }
+
+  .sticky-mobile-map-col .route-map-card {
+    height: auto !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .scrollable-mobile-content-col {
+    order: 1;
+  }
+
+  /* Report Leaflet Map */
   #reportMap {
     height: 240px !important;
   }
@@ -959,9 +1008,29 @@ body {
   .card-body {
     padding: 14px !important;
   }
-  .form-control, .form-select, .btn {
-    min-height: 44px;
+  .form-control, .form-select {
+    min-height: 42px;
     font-size: 0.92rem;
+  }
+  .btn:not(.btn-sm):not(.preset-route-btn) {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+  .btn-sm,
+  .preset-route-btn {
+    min-height: 32px !important;
+    height: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    line-height: 1.2 !important;
   }
   .saferoad-footer {
     display: none; /* Replaced by mobile bottom nav for cleaner phone experience */

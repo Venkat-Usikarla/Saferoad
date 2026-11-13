@@ -48,9 +48,13 @@
     background: var(--primary);
   }
   .preset-route-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-size: 0.78rem;
     border-radius: 20px;
     padding: 4px 12px;
+    line-height: 1.2;
     transition: all 0.2s;
   }
   .preset-route-btn:hover {
@@ -98,7 +102,7 @@
     <div class="row g-4">
 
       <!-- LEFT: Inputs & Analysis Panel -->
-      <div class="col-lg-5">
+      <div class="col-lg-5 scrollable-mobile-content-col">
         <div class="route-panel p-4 mb-4">
           <h5 class="fw-700 text-dark mb-3">
             <i class="fa fa-route me-2 text-primary"></i>Plan Safe Route
@@ -192,7 +196,7 @@
       </div><!-- /col -->
 
       <!-- RIGHT: Interactive Map -->
-      <div class="col-lg-7">
+      <div class="col-lg-7 sticky-mobile-map-col">
         <div class="route-map-card">
           <div id="routeMap"></div>
         </div>
@@ -216,6 +220,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors',
   maxZoom: 19
 }).addTo(routeMap);
+
+// Invalidate size on mobile/desktop resize
+setTimeout(() => { routeMap.invalidateSize(); }, 300);
+window.addEventListener('resize', () => { routeMap.invalidateSize(); });
 
 let startMarker = null;
 let endMarker = null;
