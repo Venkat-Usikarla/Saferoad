@@ -73,12 +73,17 @@ A smart civic reporting and road safety platform empowering citizens of Hyderaba
 
 ---
 
-## 🔐 Default Admin Credentials
+## 🔐 Admin Accounts & Authentication
 
-* **Chief Commissioner (Super Admin):** `admin` / `saferoad2026`
-* **Serilingampally Zone (Hitec City / Gachibowli):** `admin_serilingampally` / `serilingampally2026`
-* **Khairatabad Zone (Banjara / Jubilee Hills):** `admin_khairatabad` / `khairatabad2026`
-* **Secunderabad Zone (Begumpet / Marredpally):** `admin_secunderabad` / `secunderabad2026`
-* **Charminar Zone (Old City):** `admin_charminar` / `charminar2026`
-* **Kukatpally Zone (Miyapur / KPHB):** `admin_kukatpally` / `kukatpally2026`
-* **LB Nagar Zone (Dilsukhnagar):** `admin_lbnagar` / `lbnagar2026`
+Administrative access is managed through one-way salted cryptographic password hashes in `admin_auth.py`. Credentials can be set or overridden dynamically in your local `.env` file:
+* `ADMIN_PASSWORD=<your-super-admin-password>`
+* `ADMIN_SERILINGAMPALLY_PASSWORD=<custom-password>`
+* etc.
+
+* **Chief Commissioner (Super Admin):** `admin`
+* **Serilingampally Zone (West):** `admin_serilingampally`
+* **Khairatabad Zone (Central):** `admin_khairatabad`
+* **Secunderabad Zone (North):** `admin_secunderabad`
+* **Charminar Zone (South):** `admin_charminar`
+* **Kukatpally Zone (North-West):** `admin_kukatpally`
+* **LB Nagar Zone (East):** `admin_lbnagar`

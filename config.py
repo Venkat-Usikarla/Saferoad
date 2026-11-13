@@ -47,22 +47,22 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
     # -----------------------------------------------------------------
-    # Admin credentials (no Admin DB model — kept in config only)
+    # Admin credentials (configured via .env or admin_auth.py hashes)
     # -----------------------------------------------------------------
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'saferoad2026')
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
     # -----------------------------------------------------------------
-    # Email Notification Configuration (Standard SMTP)
+    # Email Notification Configuration (Standard SMTP via .env)
     # -----------------------------------------------------------------
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
     MAIL_USE_TLS = True
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME', 'usikarlavenkat@gmail.com')
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', 'ogjnsrszdoskcnnn')
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.environ.get(
         'MAIL_DEFAULT_SENDER',
-        'SafeRoad Hyderabad <usikarlavenkat@gmail.com>'
+        'SafeRoad Hyderabad <notifications@saferoad.org>'
     )
     MAIL_ENABLED = True
 
