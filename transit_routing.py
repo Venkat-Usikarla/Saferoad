@@ -357,6 +357,128 @@ def find_public_transport_routes(
         })
 
     # ------------------------------------------------------------------
+    # 2. HYBRID MULTI-MODAL OPTION: TSRTC FEEDER BUS + METRO RAIL
+    # ------------------------------------------------------------------
+    # Real-world Hyderabad commute: Takes a TSRTC feeder bus to avoid traffic
+    # congestion, rides the high-speed Metro spine, and connects via bus/walk.
+    bus_start, bus_start_dist = _find_nearest_hub(start_lat, start_lng, TSRTC_HUBS)
+    bus_end, bus_end_dist = _find_nearest_hub(end_lat, end_lng, TSRTC_HUBS)
+
+    if len(metro_path) >= 2:
+        hybrid_segments = []
+        hybrid_steps = []
+        hybrid_polyline = [[start_lat, start_lng]]
+        hybrid_duration = 0
+        hybrid_fare = 0
+        hybrid_transfers = 0
+        hybrid_stops = 0
+
+        # Leg 1: TSRTC Feeder Bus to Metro (if distance > 600m or bus stop closer)
+        feeder_dist_km = haversine_m(bus_start['lat'], bus_start['lng'], start_st['lat'], start_st['lng']) / 1000.0
+        if start_walk_m > 650 or feeder_dist_km >= 1.2:
+            f_stops = max(2, round(feeder_dist_km * 1.6))
+            f_time = max(8, round(feeder_dist_km * 3.2) + 5)
+            f_route = bus_start['routes'][0] if bus_start['routes'] else 'Feeder'
+            hybrid_steps.append(
+                f"1. Board TSRTC Feeder Bus ({f_route}) at {bus_start['name']} → Alight at {start_st['name']} Metro ({f_stops} stops, ~{f_time} min)"
+            )
+            hybrid_segments.append({
+                'line': f'TSRTC Feeder Bus ({f_route})',
+                'color': '#15803d',
+                'from_station': bus_start['name'],
+                'to_station': f"{start_st['name']} Metro",
+                'stops': f_stops,
+                'coords': [[start_lat, start_lng], [bus_start['lat'], bus_start['lng']], [start_st['lat'], start_st['lng']]],
+            })
+            hybrid_polyline.extend([[bus_start['lat'], bus_start['lng']], [start_st['lat'], start_st['lng']]])
+            hybrid_fare += 15
+            hybrid_duration += f_time
+            hybrid_stops += f_stops
+            hybrid_transfers += 1
+        else:
+            w_time = max(2, round(start_walk_m / 80))
+            hybrid_steps.append(f"1. Walk {round(start_walk_m)} m (~{w_time} min) to {start_st['name']} Metro Station")
+            hybrid_duration += w_time
+            hybrid_polyline.append([start_st['lat'], start_st['lng']])
+
+        # Leg 2: Metro Rail Core Spine (high speed, avoids city road jams)
+        for s_idx, seg in enumerate(segments):
+            hybrid_segments.append(dict(seg))
+            hybrid_steps.append(
+                f"2.{s_idx + 1} Board {seg['line']} Line Metro: {seg['from_station']} → {seg['to_station']} ({seg['stops']} stops)"
+            )
+            if s_idx < len(segments) - 1:
+                hybrid_steps.append(f"   ↳ Interchange at {seg['to_station']} to {segments[s_idx + 1]['line']} Line")
+                hybrid_transfers += 1
+
+        hybrid_fare += metro_fare
+        hybrid_duration += metro_ride_min
+        hybrid_stops += total_stops
+        for seg in segments:
+            hybrid_polyline.extend(seg['coords'])
+
+        # Leg 3: Last-mile TSRTC Connecting Bus or Walk
+        last_bus_dist_km = haversine_m(end_st['lat'], end_st['lng'], bus_end['lat'], bus_end['lng']) / 1000.0
+        if end_walk_m > 650 or last_bus_dist_km >= 1.2:
+            c_stops = max(2, round(last_bus_dist_km * 1.6))
+            c_time = max(8, round(last_bus_dist_km * 3.2) + 5)
+            c_route = bus_end['routes'][0] if bus_end['routes'] else 'Connecting'
+            hybrid_steps.append(
+                f"3. At {end_st['name']} Metro, board TSRTC Connecting Bus ({c_route}) → Alight at {bus_end['name']} ({c_stops} stops, ~{c_time} min)"
+            )
+            hybrid_segments.append({
+                'line': f'TSRTC Connecting Bus ({c_route})',
+                'color': '#15803d',
+                'from_station': f"{end_st['name']} Metro",
+                'to_station': bus_end['name'],
+                'stops': c_stops,
+                'coords': [[end_st['lat'], end_st['lng']], [bus_end['lat'], bus_end['lng']], [end_lat, end_lng]],
+            })
+            hybrid_polyline.extend([[bus_end['lat'], bus_end['lng']], [end_lat, end_lng]])
+            hybrid_fare += 15
+            hybrid_duration += c_time
+            hybrid_stops += c_stops
+            hybrid_transfers += 1
+        else:
+            w_time = max(2, round(end_walk_m / 80))
+            hybrid_steps.append(f"3. Walk {round(end_walk_m)} m (~{w_time} min) from {end_st['name']} Metro to Destination")
+            hybrid_duration += w_time
+            hybrid_polyline.append([end_lat, end_lng])
+
+        hybrid_hazards = (
+            _check_station_hazards(bus_start['lat'], bus_start['lng'], hazards, 500)
+            + _check_station_hazards(start_st['lat'], start_st['lng'], hazards, 500)
+            + _check_station_hazards(end_st['lat'], end_st['lng'], hazards, 500)
+            + _check_station_hazards(bus_end['lat'], bus_end['lng'], hazards, 500)
+        )
+        # Deduplicate hazards by report_id
+        seen_hids = set()
+        unique_hybrid_hazards = []
+        for h in hybrid_hazards:
+            if h['report_id'] not in seen_hids:
+                seen_hids.add(h['report_id'])
+                unique_hybrid_hazards.append(h)
+
+        options.append({
+            'id': 'hybrid',
+            'mode': 'Hybrid: TSRTC Feeder Bus + Hyderabad Metro',
+            'badge': 'Integrated Multi-Modal (Best Balance)',
+            'badge_color': '#d97706',
+            'icon': 'fa-shuffle',
+            'duration_min': hybrid_duration,
+            'fare_inr': hybrid_fare,
+            'frequency': 'Bus every 8–10m + Metro every 4–6m',
+            'transfers': hybrid_transfers,
+            'stops_count': hybrid_stops,
+            'boarding_point': f"{bus_start['name']} / {start_st['name']} Metro",
+            'alighting_point': f"{end_st['name']} Metro / {bus_end['name']}",
+            'segments': hybrid_segments,
+            'polyline': hybrid_polyline,
+            'steps': hybrid_steps,
+            'station_hazards': unique_hybrid_hazards,
+        })
+
+    # ------------------------------------------------------------------
     # 2. TSRTC CITY BUS OPTION
     # ------------------------------------------------------------------
     bus_start, bus_start_dist = _find_nearest_hub(start_lat, start_lng, TSRTC_HUBS)
