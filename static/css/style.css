@@ -787,22 +787,197 @@ body {
 .fade-in-delay-3 { animation-delay: 0.3s; }
 
 /* =============================================
-   RESPONSIVE ADJUSTMENTS
+   MOBILE PWA BOTTOM NAVIGATION & APP BAR
+   ============================================= */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1040;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  flex: 1;
+  transition: color 0.2s ease;
+}
+
+.mobile-nav-item i {
+  font-size: 1.15rem;
+  margin-bottom: 2px;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item.active {
+  color: #e63946;
+}
+
+.mobile-nav-action .action-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e63946 0%, #f4a261 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -18px;
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.35);
+  font-size: 1.1rem;
+  border: 3px solid #ffffff;
+  transition: transform 0.2s ease;
+}
+
+.mobile-nav-action:active .action-circle {
+  transform: scale(0.92);
+}
+
+.mobile-nav-action span {
+  margin-top: 1px;
+}
+
+/* PWA Install Banner */
+.pwa-install-banner {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  max-width: 440px;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1050;
+  animation: slideDown 0.35s ease;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-40px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.pwa-install-banner .install-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+/* =============================================
+   RESPONSIVE ADJUSTMENTS (MOBILE-FIRST POLISH)
    ============================================= */
 @media (max-width: 768px) {
-  .hero-section { padding: 60px 0 50px; }
-  .hero-title { font-size: 1.9rem; }
-  .map-page-wrapper { flex-direction: column; height: auto; }
-  .map-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid #dee2e6; max-height: 320px; }
-  .map-main { height: 60vh; }
-  .map-legend { display: none; }
-  .stat-number { font-size: 1.7rem; }
-  .admin-stats-card .stat-value { font-size: 1.5rem; }
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .saferoad-navbar .navbar-brand {
+    font-size: 1.2rem;
+  }
+  .hero-section {
+    padding: 44px 0 36px;
+    text-align: center;
+  }
+  .hero-title {
+    font-size: 1.85rem;
+    line-height: 1.25;
+  }
+  .hero-subtitle {
+    font-size: 0.92rem;
+    margin-bottom: 20px;
+  }
+  .hero-section .d-flex {
+    justify-content: center;
+  }
+  .btn-hero-primary,
+  .btn-hero-outline {
+    width: 100%;
+    margin-bottom: 6px;
+  }
+  .stat-counters {
+    margin-top: 24px;
+  }
+  .stat-card {
+    padding: 12px 8px;
+  }
+  .stat-number {
+    font-size: 1.45rem;
+  }
+  .stat-label {
+    font-size: 0.72rem;
+  }
+  .map-page-wrapper {
+    flex-direction: column;
+    height: auto;
+  }
+  .map-sidebar {
+    width: 100%;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+    max-height: 260px;
+  }
+  .map-main {
+    height: 52vh;
+  }
+  .map-legend {
+    display: none;
+  }
+
+  /* Responsive Heights for Route and Transit Leaflet Maps */
+  #routeMap,
+  #transitMap,
+  .route-map-card {
+    height: 340px !important;
+  }
+  #reportMap {
+    height: 240px !important;
+  }
+
+  .admin-stats-card .stat-value {
+    font-size: 1.4rem;
+  }
+  .card-body {
+    padding: 14px !important;
+  }
+  .form-control, .form-select, .btn {
+    min-height: 44px;
+    font-size: 0.92rem;
+  }
+  .saferoad-footer {
+    display: none; /* Replaced by mobile bottom nav for cleaner phone experience */
+  }
 }
 
 @media (max-width: 576px) {
-  .cat-card { padding: 1rem 0.5rem; }
-  .cat-icon { font-size: 1.8rem; }
+  .cat-card {
+    padding: 0.85rem 0.4rem;
+  }
+  .cat-icon {
+    font-size: 1.6rem;
+  }
+  .cat-label {
+    font-size: 0.75rem;
+  }
 }
 
 /* =============================================
@@ -810,13 +985,15 @@ body {
    ============================================= */
 @media print {
   .saferoad-navbar,
+  .mobile-bottom-nav,
+  .pwa-install-banner,
   .saferoad-footer,
   .btn,
   .map-sidebar,
   #mainMap,
   #reportMap { display: none !important; }
 
-  body { background: #fff; font-size: 12pt; }
+  body { background: #fff; font-size: 12pt; padding-bottom: 0 !important; }
   .report-card, .admin-stats-card, .form-card { box-shadow: none; border: 1px solid #ccc; }
   .hero-section { background: #1d3557 !important; -webkit-print-color-adjust: exact; }
 }

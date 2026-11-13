@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>{% block title %}SafeRoad — Making Roads Safer Together{% endblock %}</title>
 
   <!-- Bootstrap 5 -->
@@ -168,15 +168,86 @@
   </footer>
   <!-- ===== END FOOTER ===== -->
 
+  <!-- ===== MOBILE PWA BOTTOM NAV BAR (Phones Only) ===== -->
+  <nav class="mobile-bottom-nav d-md-none" aria-label="Mobile Navigation">
+    <a href="{{ url_for('index') }}" class="mobile-nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+      <i class="fa fa-house"></i>
+      <span>Home</span>
+    </a>
+    <a href="{{ url_for('route_safety_page') }}" class="mobile-nav-item {% if request.endpoint == 'route_safety_page' %}active{% endif %}">
+      <i class="fa fa-route"></i>
+      <span>Route</span>
+    </a>
+    <a href="{{ url_for('report_hazard') }}" class="mobile-nav-item mobile-nav-action {% if request.endpoint == 'report_hazard' %}active{% endif %}">
+      <div class="action-circle">
+        <i class="fa fa-plus"></i>
+      </div>
+      <span>Report</span>
+    </a>
+    <a href="{{ url_for('public_transport_page') }}" class="mobile-nav-item {% if request.endpoint == 'public_transport_page' %}active{% endif %}">
+      <i class="fa fa-train-subway"></i>
+      <span>Transit</span>
+    </a>
+    <a href="{{ url_for('my_reports') }}" class="mobile-nav-item {% if request.endpoint == 'my_reports' %}active{% endif %}">
+      <i class="fa fa-clipboard-list"></i>
+      <span>Track</span>
+    </a>
+  </nav>
+
+  <!-- PWA Install Banner (Mobile) -->
+  <div id="pwaInstallBanner" class="pwa-install-banner d-none">
+    <div class="d-flex align-items-center gap-2">
+      <div class="install-icon">🛣️</div>
+      <div>
+        <div class="fw-700" style="font-size:0.85rem;">Install SafeRoad</div>
+        <div class="text-muted" style="font-size:0.72rem;">Add to Home Screen for fast mobile reporting</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button id="pwaInstallBtn" class="btn btn-sm btn-primary fw-700 px-3 py-1" style="font-size:0.78rem;">Install</button>
+      <button id="pwaDismissBtn" class="btn btn-sm text-secondary p-1" style="font-size:0.9rem;" title="Dismiss">&times;</button>
+    </div>
+  </div>
+
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- PWA Service Worker Registration -->
+  <!-- PWA Service Worker & Install Prompt Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
           .catch(err => console.log('SW registration error:', err));
+      });
+    }
+
+    let deferredPrompt = null;
+    const banner = document.getElementById('pwaInstallBanner');
+    const installBtn = document.getElementById('pwaInstallBtn');
+    const dismissBtn = document.getElementById('pwaDismissBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+        banner.classList.remove('d-none');
+      }
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        banner.classList.add('d-none');
+      });
+    }
+
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        banner.classList.add('d-none');
+        sessionStorage.setItem('pwa_dismissed', '1');
       });
     }
   </script>
